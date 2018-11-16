@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="client-nojs">
+<head>
+<title>Creating a 64-bit kernel using a separate loader - OSDev Wiki</title>
+<meta charset="UTF-8" />
+<meta name="generator" content="MediaWiki 1.18.0" />
+<link rel="shortcut icon" href="/favicon.ico" />
+<link rel="search" type="application/opensearchdescription+xml" href="/opensearch_desc.php" title="OSDev Wiki (en)" />
+<link rel="EditURI" type="application/rsd+xml" href="https://wiki.osdev.org/api.php?action=rsd" />
+<link rel="alternate" type="application/atom+xml" title="OSDev Wiki Atom feed" href="/index.php?title=Special:RecentChanges&amp;feed=atom" />
+<link rel="stylesheet" href="/load.php?debug=false&amp;lang=en&amp;modules=mediawiki.legacy.commonPrint%2Cshared%7Cskins.vector&amp;only=styles&amp;skin=vector&amp;*" />
+<meta name="ResourceLoaderDynamicStyles" content="" />
+<link rel="stylesheet" href="/load.php?debug=false&amp;lang=en&amp;modules=site&amp;only=styles&amp;skin=vector&amp;*" />
+<style>a:lang(ar),a:lang(ckb),a:lang(fa),a:lang(kk-arab),a:lang(mzn),a:lang(ps),a:lang(ur){text-decoration:none}a.new,#quickbar a.new{color:#ba0000}
+
+/* cache key: wikidb:resourceloader:filter:minify-css:4:c88e2bcd56513749bec09a7e29cb3ffa */
+</style>
+<script src="/load.php?debug=false&amp;lang=en&amp;modules=startup&amp;only=scripts&amp;skin=vector&amp;*"></script>
+<script>if(window.mw){
+	mw.config.set({"wgCanonicalNamespace": "", "wgCanonicalSpecialPageName": false, "wgNamespaceNumber": 0, "wgPageName": "Creating_a_64-bit_kernel_using_a_separate_loader", "wgTitle": "Creating a 64-bit kernel using a separate loader", "wgCurRevisionId": 22613, "wgArticleId": 3998, "wgIsArticle": true, "wgAction": "view", "wgUserName": null, "wgUserGroups": ["*"], "wgCategories": ["Level 3 Tutorials", "In Progress", "Tutorials", "X86-64"], "wgBreakFrames": false, "wgRestrictionEdit": [], "wgRestrictionMove": []});
+}
+</script><script>if(window.mw){
+	mw.loader.load(["mediawiki.page.startup"]);
+}
+</script>
+<style type="text/css">/*<![CDATA[*/
+.source-bash {line-height: normal;}
+.source-bash li, .source-bash pre {
+	line-height: normal; border: 0px none white;
+}
+/**
+ * GeSHi Dynamically Generated Stylesheet
+ * --------------------------------------
+ * Dynamically generated stylesheet for bash
+ * CSS class: source-bash, CSS id: 
+ * GeSHi (C) 2004 - 2007 Nigel McNie, 2007 - 2008 Benny Baumann
+ * (http://qbnz.com/highlighter/ and http://geshi.org/)
+ * --------------------------------------
+ */
+.bash.source-bash .de1, .bash.source-bash .de2 {font: normal normal 1em/1.2em monospace; margin:0; padding:0; background:none; vertical-align:top;}
+.bash.source-bash  {font-family:monospace;}
+.bash.source-bash .imp {font-weight: bold; color: red;}
+.bash.source-bash li, .bash.source-bash .li1 {font-weight: normal; vertical-align:top;}
+.bash.source-bash .ln {width:1px;text-align:right;margin:0;padding:0 2px;vertical-align:top;}
+.bash.source-bash .li2 {font-weight: bold; vertical-align:top;}
+.bash.source-bash .kw1 {color: #000000; font-weight: bold;}
+.bash.source-bash .kw2 {color: #c20cb9; font-weight: bold;}
+.bash.source-bash .kw3 {color: #7a0874; font-weight: bold;}
+.bash.source-bash .co0 {color: #666666; font-style: italic;}
+.bash.source-bash .co1 {color: #800000;}
+.bash.source-bash .co2 {color: #cc0000; font-style: italic;}
+.bash.source-bash .co3 {color: #000000; font-weight: bold;}
+.bash.source-bash .co4 {color: #666666;}
+.bash.source-bash .es1 {color: #000099; font-weight: bold;}
+.bash.source-bash .es2 {color: #007800;}
+.bash.source-bash .es3 {color: #007800;}
+.bash.source-bash .es4 {color: #007800;}
+.bash.source-bash .es5 {color: #780078;}
+.bash.source-bash .es_h {color: #000099; font-weight: bold;}
+.bash.source-bash .br0 {color: #7a0874; font-weight: bold;}
+.bash.source-bash .sy0 {color: #000000; font-weight: bold;}
+.bash.source-bash .st0 {color: #ff0000;}
+.bash.source-bash .st_h {color: #ff0000;}
+.bash.source-bash .nu0 {color: #000000;}
+.bash.source-bash .re0 {color: #007800;}
+.bash.source-bash .re1 {color: #007800;}
+.bash.source-bash .re2 {color: #007800;}
+.bash.source-bash .re4 {color: #007800;}
+.bash.source-bash .re5 {color: #660033;}
+.bash.source-bash .ln-xtra, .bash.source-bash li.ln-xtra, .bash.source-bash div.ln-xtra {background-color: #ffc;}
+.bash.source-bash span.xtra { display:block; }
+
+/*]]>*/
+</style>
+<style type="text/css">/*<![CDATA[*/
+@import "/index.php?title=MediaWiki:Geshi.css&usemsgcache=yes&action=raw&ctype=text/css&smaxage=18000";
+/*]]>*/
+</style><style type="text/css">/*<![CDATA[*/
+.source-asm {line-height: normal;}
+.source-asm li, .source-asm pre {
+	line-height: normal; border: 0px none white;
+}
+/**
+ * GeSHi Dynamically Generated Stylesheet
+ * --------------------------------------
+ * Dynamically generated stylesheet for asm
+ * CSS class: source-asm, CSS id: 
+ * GeSHi (C) 2004 - 2007 Nigel McNie, 2007 - 2008 Benny Baumann
+ * (http://qbnz.com/highlighter/ and http://geshi.org/)
+ * --------------------------------------
+ */
+.asm.source-asm .de1, .asm.source-asm .de2 {font: normal normal 1em/1.2em monospace; margin:0; padding:0; background:none; vertical-align:top;}
+.asm.source-asm  {font-family:monospace;}
+.asm.source-asm .imp {font-weight: bold; color: red;}
+.asm.source-asm li, .asm.source-asm .li1 {font-weight: normal; vertical-align:top;}
+.asm.source-asm .ln {width:1px;text-align:right;margin:0;padding:0 2px;vertical-align:top;}
+.asm.source-asm .li2 {font-weight: bold; vertical-align:top;}
+.asm.source-asm .kw1 {color: #00007f; font-weight: bold;}
+.asm.source-asm .kw2 {color: #0000ff; font-weight: bold;}
+.asm.source-asm .kw3 {color: #00007f;}
+.asm.source-asm .kw4 {color: #000000; font-weight: bold;}
+.asm.source-asm .kw5 {color: #000000; font-weight: bold;}
+.asm.source-asm .co1 {color: #666666; font-style: italic;}
+.asm.source-asm .co2 {color: #adadad; font-style: italic;}
+.asm.source-asm .es0 {color: #000099; font-weight: bold;}
+.asm.source-asm .br0 {color: #009900; font-weight: bold;}
+.asm.source-asm .sy0 {color: #339933;}
+.asm.source-asm .st0 {color: #7f007f;}
+.asm.source-asm .nu0 {color: #0000ff;}
+.asm.source-asm .ln-xtra, .asm.source-asm li.ln-xtra, .asm.source-asm div.ln-xtra {background-color: #ffc;}
+.asm.source-asm span.xtra { display:block; }
+
+/*]]>*/
+</style>
+<style type="text/css">/*<![CDATA[*/
+@import "/index.php?title=MediaWiki:Geshi.css&usemsgcache=yes&action=raw&ctype=text/css&smaxage=18000";
+/*]]>*/
+</style><style type="text/css">/*<![CDATA[*/
+.source-c {line-height: normal;}
+.source-c li, .source-c pre {
+	line-height: normal; border: 0px none white;
+}
+/**
+ * GeSHi Dynamically Generated Stylesheet
+ * --------------------------------------
+ * Dynamically generated stylesheet for c
+ * CSS class: source-c, CSS id: 
+ * GeSHi (C) 2004 - 2007 Nigel McNie, 2007 - 2008 Benny Baumann
+ * (http://qbnz.com/highlighter/ and http://geshi.org/)
+ * --------------------------------------
+ */
+.c.source-c .de1, .c.source-c .de2 {font: normal normal 1em/1.2em monospace; margin:0; padding:0; background:none; vertical-align:top;}
+.c.source-c  {font-family:monospace;}
+.c.source-c .imp {font-weight: bold; color: red;}
+.c.source-c li, .c.source-c .li1 {font-weight: normal; vertical-align:top;}
+.c.source-c .ln {width:1px;text-align:right;margin:0;padding:0 2px;vertical-align:top;}
+.c.source-c .li2 {font-weight: bold; vertical-align:top;}
+.c.source-c .kw1 {color: #b1b100;}
+.c.source-c .kw2 {color: #000000; font-weight: bold;}
+.c.source-c .kw3 {color: #000066;}
+.c.source-c .kw4 {color: #993333;}
+.c.source-c .co1 {color: #666666; font-style: italic;}
+.c.source-c .co2 {color: #339933;}
+.c.source-c .coMULTI {color: #808080; font-style: italic;}
+.c.source-c .es0 {color: #000099; font-weight: bold;}
+.c.source-c .es1 {color: #000099; font-weight: bold;}
+.c.source-c .es2 {color: #660099; font-weight: bold;}
+.c.source-c .es3 {color: #660099; font-weight: bold;}
+.c.source-c .es4 {color: #660099; font-weight: bold;}
+.c.source-c .es5 {color: #006699; font-weight: bold;}
+.c.source-c .br0 {color: #009900;}
+.c.source-c .sy0 {color: #339933;}
+.c.source-c .st0 {color: #ff0000;}
+.c.source-c .nu0 {color: #0000dd;}
+.c.source-c .nu6 {color: #208080;}
+.c.source-c .nu8 {color: #208080;}
+.c.source-c .nu12 {color: #208080;}
+.c.source-c .nu16 {color:#800080;}
+.c.source-c .nu17 {color:#800080;}
+.c.source-c .nu18 {color:#800080;}
+.c.source-c .nu19 {color:#800080;}
+.c.source-c .me1 {color: #202020;}
+.c.source-c .me2 {color: #202020;}
+.c.source-c .ln-xtra, .c.source-c li.ln-xtra, .c.source-c div.ln-xtra {background-color: #ffc;}
+.c.source-c span.xtra { display:block; }
+
+/*]]>*/
+</style>
+<style type="text/css">/*<![CDATA[*/
+@import "/index.php?title=MediaWiki:Geshi.css&usemsgcache=yes&action=raw&ctype=text/css&smaxage=18000";
+/*]]>*/
+</style><!--[if lt IE 7]><style type="text/css">body{behavior:url("/skins/vector/csshover.min.htc")}</style><![endif]--></head>
+<body class="mediawiki ltr sitedir-ltr ns-0 ns-subject page-Creating_a_64-bit_kernel_using_a_separate_loader action-view skin-vector">
+		<div id="mw-page-base" class="noprint"></div>
+		<div id="mw-head-base" class="noprint"></div>
+		<!-- content -->
+		<div id="content">
+			<a id="top"></a>
+			<div id="mw-js-message" style="display:none;"></div>
+						<!-- firstHeading -->
+			<h1 id="firstHeading" class="firstHeading">Creating a 64-bit kernel using a separate loader</h1>
+			<!-- /firstHeading -->
+			<!-- bodyContent -->
+			<div id="bodyContent">
+								<!-- tagline -->
+				<div id="siteSub">From OSDev Wiki</div>
+				<!-- /tagline -->
+								<!-- subtitle -->
+				<div id="contentSub"></div>
+				<!-- /subtitle -->
+																<!-- jumpto -->
+				<div id="jump-to-nav">
+					Jump to: <a href="#mw-head">navigation</a>,
+					<a href="#p-search">search</a>
+				</div>
+				<!-- /jumpto -->
+								<!-- bodycontent -->
+				<div lang="en" dir="ltr" class="mw-content-ltr"><table style="font-size:95%; line-height:1.5em; padding:0.25em; float:right; margin: 0 0 8px 15px; clear:right; border:1px solid #aaaaaa; background:#eee; text-align:center;;"><tr><th>Difficulty level</th></tr><tr><td><a href="/File:Difficulty_3.png" class="image"><img alt="Difficulty 3.png" src="/images/c/c1/Difficulty_3.png" width="46" height="14" /></a><br />Advanced</td></tr></table><table style="font-size:95%; line-height:1.5em; padding:0.25em; float:right; margin: 0 0 8px 15px; clear: right; border:1px solid #aaaaaa; background:#eee; text-align:center; width:200px;&#160;;"><tr><th style="background:#ffce7b; padding:0.3em; font-size:1.1em;"><a href="/Kernels" title="Kernels" class="mw-redirect">Kernel Designs</a></th></tr><tr><th>Models</th></tr><tr><td><div>
+<p><a href="/Monolithic_Kernel" title="Monolithic Kernel">Monolithic Kernel</a><br />
+<a href="/Microkernel" title="Microkernel">Microkernel</a><br />
+<a href="/Hybrid_Kernel" title="Hybrid Kernel">Hybrid Kernel</a><br />
+<a href="/Exokernel" title="Exokernel">Exokernel</a><br />
+<a href="/Nanokernel" title="Nanokernel" class="mw-redirect">Nano/Picokernel</a><br />
+<a href="/Exokernel#Cache_Kernel" title="Exokernel">Cache Kernel</a><br />
+<a href="/Exokernel#Virtualizing_Kernel" title="Exokernel">Virtualizing Kernel</a><br />
+<a href="/Megalithic_Kernel" title="Megalithic Kernel">Megalithic Kernel</a><br />
+</p>
+</div></td></tr><tr><th>Other Concepts</th></tr><tr><td><div>
+<p><a href="/Modular_Kernel" title="Modular Kernel">Modular Kernel</a><br />
+<a href="/Higher_Half_Kernel" title="Higher Half Kernel">Higher Half Kernel</a><br />
+<a href="/Creating_a_64-bit_kernel" title="Creating a 64-bit kernel">64-bit Kernel</a><br />
+</p>
+</div></td></tr></table>
+<center>
+<table style="border: 1px solid #cfcfbf; margin-top: 25px; margin-bottom: 25px; background-color: #f0f0ff; text-align: center;">
+<tr>
+<td>
+<p><a href="/File:Under_Construction.png" class="image" title="This page is under construction!"><img alt="This page is under construction!" src="/images/1/14/Under_Construction.png" width="50" height="50" /></a>
+This page or section is a work in progress and may thus be incomplete. Its content may be changed in the near future.
+</p>
+</td>
+<td>
+</td></tr></table>
+</center>
+<p>This page is an extension to <a href="/Creating_a_64-bit_kernel" title="Creating a 64-bit kernel">Creating a 64-bit kernel</a>, specifically the section <a href="/Creating_a_64-bit_kernel#With_a_separate_loader" title="Creating a 64-bit kernel">Loading with a separate loader</a>. If you have not read that, go read it now.<br />
+<b>This may or may not work with your kernel and you may or may not need to tweak it to work with your kernel.</b>
+</p>
+<table id="toc" class="toc"><tr><td><div id="toctitle"><h2>Contents</h2></div>
+<ul>
+<li class="toclevel-1 tocsection-1"><a href="#64-bit_kernel"><span class="tocnumber">1</span> <span class="toctext">64-bit kernel</span></a></li>
+<li class="toclevel-1 tocsection-2"><a href="#32-bit_loader"><span class="tocnumber">2</span> <span class="toctext">32-bit loader</span></a>
+<ul>
+<li class="toclevel-2 tocsection-3"><a href="#Assembly_bootstrap"><span class="tocnumber">2.1</span> <span class="toctext">Assembly bootstrap</span></a></li>
+<li class="toclevel-2 tocsection-4"><a href="#Loader"><span class="tocnumber">2.2</span> <span class="toctext">Loader</span></a></li>
+<li class="toclevel-2 tocsection-5"><a href="#Setting_up_long_mode"><span class="tocnumber">2.3</span> <span class="toctext">Setting up long mode</span></a></li>
+<li class="toclevel-2 tocsection-6"><a href="#Compiling_and_linking_the_loader"><span class="tocnumber">2.4</span> <span class="toctext">Compiling and linking the loader</span></a></li>
+<li class="toclevel-2 tocsection-7"><a href="#GRUB"><span class="tocnumber">2.5</span> <span class="toctext">GRUB</span></a></li>
+</ul>
+</li>
+<li class="toclevel-1 tocsection-8"><a href="#See_Also"><span class="tocnumber">3</span> <span class="toctext">See Also</span></a>
+<ul>
+<li class="toclevel-2 tocsection-9"><a href="#Articles"><span class="tocnumber">3.1</span> <span class="toctext">Articles</span></a></li>
+</ul>
+</li>
+</ul>
+</td></tr></table>
+<h2> <span class="mw-headline" id="64-bit_kernel"> 64-bit kernel </span></h2>
+<p>The kernel itself should not contain any multiboot headers, and does not need an assembly bootstrap (you are free to use one if you find it necessary).<br />
+The OUPUT_FORMAT, as specified in your linker script, should be elf64-x86-64 for it to be loaded correctly by the Loader.<br />
+</p><p>After your loader has passed control to the kernel, you should set up a 64-bit IDT and paging.<br />
+</p><p>Compile C files with
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="bash source-bash"><pre class="de1">x86_64-elf-gcc <span class="re5">-m64</span> <span class="re5">-c</span> <span class="sy0">&lt;</span><span class="kw3">source</span> <span class="kw2">file</span><span class="sy0">&gt;</span> <span class="re5">-o</span> <span class="sy0">&lt;</span>output<span class="sy0">&gt;</span> <span class="re5">-ffreestanding</span> <span class="re5">-z</span> max-page-size=0x1000 <span class="re5">-mno-red-zone</span> <span class="re5">-mno-mmx</span> <span class="re5">-mno-sse</span> <span class="re5">-mno-sse2</span> <span class="re5">-std</span>=gnu99 <span class="re5">-O2</span> <span class="re5">-Wall</span> <span class="re5">-Wextra</span> <span class="re5">-I</span> <span class="sy0">&lt;</span>path to your header files<span class="sy0">&gt;</span></pre></div></div>
+<p>Link the kernel with
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="bash source-bash"><pre class="de1">x86_64-elf-gcc <span class="re5">-T</span> <span class="sy0">&lt;</span>linker script<span class="sy0">&gt;</span> <span class="re5">-o</span> <span class="sy0">&lt;</span>output<span class="sy0">&gt;</span> <span class="sy0">&lt;</span>all object files<span class="sy0">&gt;</span> <span class="re5">-ffreestanding</span> <span class="re5">-O2</span> <span class="re5">-nostdlib</span> <span class="re5">-lgcc</span></pre></div></div>
+<p>Your ouput should be copied to loader_build/boot/kernel.bin (See <a href="#GRUB">32-bit loader GRUB</a>)
+</p>
+<h2> <span class="mw-headline" id="32-bit_loader"> 32-bit loader </span></h2>
+<p>Your loader will be similar to the kernel made in the <a href="/Bare_Bones" title="Bare Bones">Bare Bones</a> tutorial. 
+</p>
+<h3> <span class="mw-headline" id="Assembly_bootstrap"> Assembly bootstrap </span></h3>
+<p>It starts with a multiboot header and an assembly routine to set up a stack and call the C code. <br />
+Additionally it might check eax to see if it contains 0x2BADB002 (which means it was loaded by a multiboot bootloader)
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="asm source-asm"><pre class="de1">_start<span class="sy0">:</span>
+	<span class="kw1">cli</span>                              <span class="co1">; Clear interrupts, we don't want them as long as we are in the loader</span>
+	<span class="kw1">mov</span>	<span class="kw3">esp</span><span class="sy0">,</span> stack_top           <span class="co1">; Set up a valid stack</span>
+        <span class="kw1">mov</span>     <span class="kw3">ebp</span><span class="sy0">,</span> stack_top
+&#160;
+	<span class="kw1">push</span>	<span class="kw3">ebx</span>                      <span class="co1">; Push pointer to multiboot info structure</span>
+	<span class="kw1">call</span>	lmain</pre></div></div>
+<h3> <span class="mw-headline" id="Loader"> Loader </span></h3>
+<p>The loader must now set up its own <b>32-bit</b> <a href="/Global_Descriptor_Table" title="Global Descriptor Table">GDT</a> and parse the multiboot structure given to it by the bootstrap.<br />
+A header containing useful multiboot structures can be downloaded <a rel="nofollow" class="external text" href="https://www.gnu.org/software/grub/manual/multiboot/html_node/multiboot_002eh.html">here</a>
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="c source-c"><pre class="de1"><span class="co2">#include &quot;multiboot.h&quot;</span>
+&#160;
+<span class="coMULTI">/* This function gets called by the bootloader */</span>
+<span class="kw4">void</span> lmain<span class="br0">&#40;</span><span class="kw4">const</span> <span class="kw4">void</span><span class="sy0">*</span> multiboot_struct<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+        <span class="co1">// Set up GDT</span>
+&#160;
+        <span class="kw4">const</span> multiboot_info_t<span class="sy0">*</span> mb_info <span class="sy0">=</span> multiboot_struct<span class="sy0">;</span>            <span class="coMULTI">/* Make pointer to multiboot_info_t struct */</span>
+	multiboot_uint32_t mb_flags <span class="sy0">=</span> mb_info<span class="sy0">-&gt;</span>flags<span class="sy0">;</span>                  <span class="coMULTI">/* Get flags from mb_info */</span>
+&#160;
+        <span class="kw4">void</span><span class="sy0">*</span> kentry <span class="sy0">=</span> NULL<span class="sy0">;</span>                                           <span class="coMULTI">/* Pointer to the kernel entry point */</span>
+&#160;
+        <span class="kw1">if</span> <span class="br0">&#40;</span>mb_flags <span class="sy0">&amp;</span> MULTIBOOT_INFO_MODS<span class="br0">&#41;</span> <span class="br0">&#123;</span>                          <span class="coMULTI">/* Check if modules are available */</span>
+                multiboot_uint32_t mods_count <span class="sy0">=</span> mb_info<span class="sy0">-&gt;</span>mods_count<span class="sy0">;</span>   <span class="coMULTI">/* Get the amount of modules available */</span>
+		multiboot_uint32_t mods_addr <span class="sy0">=</span> mb_info<span class="sy0">-&gt;</span>mods_addr<span class="sy0">;</span>     <span class="coMULTI">/* And the starting address of the modules */</span>
+&#160;
+                <span class="kw1">for</span> <span class="br0">&#40;</span><span class="kw4">uint32_t</span> mod <span class="sy0">=</span> <span class="nu0">0</span><span class="sy0">;</span> mod <span class="sy0">&lt;</span> mods_count<span class="sy0">;</span> mod<span class="sy0">++</span><span class="br0">&#41;</span> <span class="br0">&#123;</span>
+                        multiboot_module_t<span class="sy0">*</span> module <span class="sy0">=</span> <span class="br0">&#40;</span>multiboot_module_t<span class="sy0">*</span><span class="br0">&#41;</span><span class="br0">&#40;</span>mods_addr <span class="sy0">+</span> <span class="br0">&#40;</span>mod <span class="sy0">*</span> <span class="kw4">sizeof</span><span class="br0">&#40;</span>multiboot_module_t<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#41;</span><span class="sy0">;</span>     <span class="coMULTI">/* Loop through all modules */</span>
+                <span class="br0">&#125;</span>
+        <span class="br0">&#125;</span>
+<span class="br0">&#125;</span></pre></div></div>
+<p>Every multiboot module has a command line associated with it, available from the multiboot_module_t is a pointer to it.<br />
+One might load all the modules available into memory at this point, or check them for a specific command line to load only a specific subset.
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="c source-c"><pre class="de1">        <span class="kw4">const</span> <span class="kw4">char</span><span class="sy0">*</span> module_string <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">const</span> <span class="kw4">char</span><span class="sy0">*</span><span class="br0">&#41;</span>module<span class="sy0">-&gt;</span>cmdline<span class="sy0">;</span>
+        <span class="coMULTI">/* Here I check if module_string is equals to the one i assigned my kernel
+           you could skip this check if you had a way of determining the kernel module */</span>
+        <span class="kw1">if</span><span class="br0">&#40;</span><span class="kw3">strcmp</span><span class="br0">&#40;</span>module_string<span class="sy0">,</span> kernel_bin_string<span class="br0">&#41;</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+                kentry <span class="sy0">=</span> load_elf_module<span class="br0">&#40;</span>module<span class="sy0">-&gt;</span>mod_start<span class="sy0">,</span> module<span class="sy0">-&gt;</span>mod_end<span class="br0">&#41;</span><span class="sy0">;</span>
+        <span class="br0">&#125;</span></pre></div></div>
+<p>Now, we must parse the kernel ELF file that the bootloader loaded into memory for us.<br />
+This can be done pretty easily using a helper function and a header I wrote following the ELF64 specification (Available [|here]) and function declarations (Available [|here])
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="c source-c"><pre class="de1">        <span class="co2">#include &quot;elf64.h&quot; // Also requires elf64.c</span>
+&#160;
+        <span class="kw4">char</span><span class="sy0">*</span> kernel_elf_space<span class="br0">&#91;</span><span class="kw4">sizeof</span><span class="br0">&#40;</span>elf_file_data_t<span class="br0">&#41;</span><span class="br0">&#93;</span><span class="sy0">;</span>
+        elf_file_data_t<span class="sy0">*</span> kernel_elf <span class="sy0">=</span> <span class="br0">&#40;</span>elf_file_data_t<span class="sy0">*</span><span class="br0">&#41;</span> kernel_elf_space<span class="sy0">;</span>                                          <span class="coMULTI">/* Pointer to elf file structure (remember there is no memory management yet) */</span>
+&#160;
+        <span class="coMULTI">/* This function parses the ELF file and returns the entry point */</span>
+        <span class="kw4">void</span><span class="sy0">*</span> load_elf_module<span class="br0">&#40;</span>multiboot_uint32_t mod_start<span class="sy0">,</span> multiboot_uint32_t mod_end<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+                <span class="kw4">unsigned</span> <span class="kw4">long</span> err <span class="sy0">=</span> parse_elf_executable<span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">void</span><span class="sy0">*</span><span class="br0">&#41;</span>mod_start<span class="sy0">,</span> <span class="kw4">sizeof</span><span class="br0">&#40;</span>elf_file_data_t<span class="br0">&#41;</span><span class="sy0">,</span> kernel_elf<span class="br0">&#41;</span><span class="sy0">;</span>    <span class="coMULTI">/* Parses ELF file and returns an error code */</span>
+                <span class="kw1">if</span><span class="br0">&#40;</span>err <span class="sy0">==</span> <span class="nu0">0</span><span class="br0">&#41;</span><span class="br0">&#123;</span>                                                                                       <span class="coMULTI">/* No errors occurred while parsing the file */</span>
+                        <span class="kw1">for</span><span class="br0">&#40;</span><span class="kw4">int</span> i <span class="sy0">=</span> <span class="nu0">0</span><span class="sy0">;</span> i <span class="sy0">&lt;</span> kernel_elf<span class="sy0">-&gt;</span>numSegments<span class="sy0">;</span> i<span class="sy0">++</span><span class="br0">&#41;</span><span class="br0">&#123;</span>
+			        elf_file_segment_t seg <span class="sy0">=</span> kernel_elf<span class="sy0">-&gt;</span>segments<span class="br0">&#91;</span>i<span class="br0">&#93;</span><span class="sy0">;</span>                                   <span class="coMULTI">/* Load all the program segments into memory */</span>
+			                                                                                            <span class="coMULTI">/*  if you want to do relocation you should do so here, */</span>
+			        <span class="kw4">const</span> <span class="kw4">void</span><span class="sy0">*</span> src <span class="sy0">=</span> <span class="br0">&#40;</span><span class="kw4">const</span> <span class="kw4">void</span><span class="sy0">*</span><span class="br0">&#41;</span> <span class="br0">&#40;</span>mod_start <span class="sy0">+</span> seg.<span class="me1">foffset</span><span class="br0">&#41;</span><span class="sy0">;</span>                          <span class="coMULTI">/*  though that would require some changes to parse_elf_executable */</span>
+			        <span class="kw3">memcpy</span><span class="br0">&#40;</span><span class="br0">&#40;</span><span class="kw4">void</span><span class="sy0">*</span><span class="br0">&#41;</span> seg.<span class="me1">address</span><span class="sy0">,</span> src<span class="sy0">,</span> seg.<span class="me1">flength</span><span class="br0">&#41;</span><span class="sy0">;</span>
+		        <span class="br0">&#125;</span>
+                        <span class="kw1">return</span> <span class="br0">&#40;</span><span class="kw4">void</span><span class="sy0">*</span><span class="br0">&#41;</span> kernel_elf<span class="sy0">-&gt;</span>entryAddr<span class="sy0">;</span>                                                       <span class="coMULTI">/* Finally we can return the entry address */</span>
+                <span class="br0">&#125;</span>
+                <span class="kw1">return</span> NULL<span class="sy0">;</span>
+        <span class="br0">&#125;</span></pre></div></div>
+<p>Finally, we can set up long mode and jump to the 64-bit kernel.<br />
+We do this by putting 2 assembly functions at the end of the lmain function
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="c source-c"><pre class="de1">       <span class="kw2">extern</span> <span class="kw4">void</span> setup_longmode<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>
+       <span class="kw2">extern</span> <span class="kw4">void</span> enter_kernel<span class="br0">&#40;</span><span class="kw4">void</span><span class="sy0">*</span> entry<span class="sy0">,</span> <span class="kw4">uint32_t</span> multiboot_info<span class="br0">&#41;</span><span class="sy0">;</span>
+&#160;
+       <span class="kw4">void</span> lmain<span class="br0">&#40;</span><span class="kw4">const</span> <span class="kw4">void</span><span class="sy0">*</span> multiboot_struct<span class="br0">&#41;</span> <span class="br0">&#123;</span>
+               <span class="co1">// Set up GDT</span>
+               <span class="co1">// Check modules</span>
+&#160;
+               setup_longmode<span class="br0">&#40;</span><span class="br0">&#41;</span><span class="sy0">;</span>                                                                                    <span class="coMULTI">/* Set up long mode and jump to the kernel code */</span>
+               enter_kernel<span class="br0">&#40;</span>kentry<span class="sy0">,</span> <span class="br0">&#40;</span><span class="kw4">uint32_t</span><span class="br0">&#41;</span> mb_info<span class="br0">&#41;</span><span class="sy0">;</span>
+       <span class="br0">&#125;</span></pre></div></div>
+<h3> <span class="mw-headline" id="Setting_up_long_mode"> Setting up long mode </span></h3>
+<p>Before we even look at switching to long mode, we must make sure that it is available on the current CPU.<br />
+</p>
+<ul><li> First, we check if the CPUID instruction is available by flipping bit 21 (CPUID) in the eflags register. If the bit was flipped CPUID is available.
+</li><li> Second, we must check if the extended CPUID functions are avaiable. This is done by checking CPUID function 0x80000000, to see if it is higher than or equals to 0x80000001.
+</li><li> And last a check if long mode is available, by executing CPUID function 0x80000001 and testing if bit 29 (Long mode) is set.
+</li></ul>
+<p>To set up long mode, many things must be done.
+</p>
+<ul><li> Disable any paging your bootloader might have set up (clearing bit 31 in CR0)
+</li><li> Then, set up 64-bit paging (but do <b>not</b> enable it yet). This includes PML4T, PDPT, PDT and PT to identity map any memory you will need before your 64-bit kernel has set up it's own paging.
+</li><li> Enable PAE (Physical Address Extension) by setting bit 5 of CR4
+</li><li> Switch to IA32e (compatibility mode), by setting bit 8 (Long Mode Enable) in MSR 0xC0000080
+</li><li> Enable paging again, by setting bit 31 in CR0
+</li></ul>
+<p><br />
+Now we are in Compatibility mode, to enter Long mode we have to set up a 64-bit GDT (This will be the GDT your kernel uses, so you have to set up everything here)<br />
+<b>The code below is not optimal in the slightest, and you should try to put together your own alternative.</b>
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="asm source-asm"><pre class="de1">global enter_kernel
+enter_kernel<span class="sy0">:</span>
+	<span class="kw1">push</span>	<span class="kw3">ebp</span>
+	<span class="kw1">mov</span>	<span class="kw3">ebp</span><span class="sy0">,</span> <span class="kw3">esp</span>                <span class="co1">; Set up the stack so the variables passed from the C code can be read</span>
+&#160;
+	<span class="kw1">mov</span>	<span class="kw3">esi</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="kw3">ebp</span><span class="sy0">+</span><span class="nu0">8</span><span class="br0">&#93;</span>            <span class="co1">; This is the kernel entry point</span>
+	<span class="kw1">mov</span>	<span class="br0">&#91;</span>k_ptr<span class="br0">&#93;</span><span class="sy0">,</span> <span class="kw3">esi</span>
+&#160;
+	<span class="kw1">lgdt</span>	<span class="br0">&#91;</span>GDT<span class="sy0">.</span>pointer<span class="br0">&#93;</span>           <span class="co1">; Load GDT</span>
+&#160;
+	<span class="kw1">mov</span>	<span class="kw3">ax</span><span class="sy0">,</span> GDT<span class="sy0">.</span><span class="kw4">data</span>            <span class="co1">; Reload data segment selectors</span>
+	<span class="kw1">mov</span>	<span class="kw3">ss</span><span class="sy0">,</span> <span class="kw3">ax</span>
+	<span class="kw1">mov</span>	<span class="kw3">ds</span><span class="sy0">,</span> <span class="kw3">ax</span>
+	<span class="kw1">mov</span>	<span class="kw3">es</span><span class="sy0">,</span> <span class="kw3">ax</span>
+	<span class="kw1">jmp</span>	GDT<span class="sy0">.</span><span class="kw4">code</span><span class="sy0">:.</span>jmp_k         <span class="co1">; Reload code selector by jumping to 64-bit code</span>
+<span class="sy0">.</span>jmp_k<span class="sy0">:</span>
+	<span class="kw1">mov</span>	<span class="kw3">edi</span><span class="sy0">,</span> <span class="br0">&#91;</span><span class="kw3">ebp</span> <span class="sy0">+</span> <span class="nu0">12</span><span class="br0">&#93;</span>		<span class="co1">; 1st argument of kernel_main (pointer to multiboot structure)</span>
+	<span class="kw1">mov</span>	<span class="kw3">eax</span><span class="sy0">,</span> <span class="br0">&#91;</span>k_ptr<span class="br0">&#93;</span>                                                                                                      <span class="co1">; This is transformed to mov rax, [k_ptr] and uses the double word reserved below </span>
+	<span class="kw4">dd</span>	<span class="nu0">0</span>			<span class="co1">; Trick the processor, contains high address of k_ptr                                    &#160;; as higher half of the address to k_ptr</span>
+	<span class="kw1">jmp</span>	<span class="kw3">eax</span>                     <span class="co1">; This part is plain bad, tricking the processor is not the best thing to do here</span>
+&#160;
+section <span class="kw4">.data</span>
+k_ptr<span class="sy0">:</span>
+	<span class="kw4">dd</span>	<span class="nu0">0</span></pre></div></div>
+<h3> <span class="mw-headline" id="Compiling_and_linking_the_loader"> Compiling and linking the loader </span></h3>
+<p>The loader must be compiled and linked as a 32-bit ELF file with the Multiboot header within the first 8 kB (See <a href="/Bare_Bones" title="Bare Bones">Bare Bones</a> Tutorial to see how to do this)<br />
+</p>
+<h3> <span class="mw-headline" id="GRUB"> GRUB </span></h3>
+<p>If you used GRUB this is an example of how to set up the directory structure:
+</p>
+<ul><li> loader_build/
+<ul><li> boot/
+<ul><li> grub/
+<ul><li> grub.cfg
+</li></ul>
+</li><li> kernel.bin         (This is the 64-bit kernel ELF file)
+</li><li> loader.bin         (This is the 32-bit loader ELF file)
+</li></ul>
+</li></ul>
+</li></ul>
+<p>Your grub.cfg file will contain at least the following
+</p>
+<pre>menuentry "Kernel" {
+     multiboot /boot/loader.bin                  // Path to the loader executable
+     module /boot/kernel.bin "KERNEL_BIN"        // Path to the kernel executable, the string in "" is your command line
+
+     // More modules may be added here in the form 'module &lt;path&gt; "&lt;cmdline&gt;"'
+}
+</pre>
+<p>Note: if you are using Multiboot 2, replace the above multiboot/module lines with multiboot2/module2
+</p><p>To build it:
+</p>
+<div dir="ltr" class="mw-geshi" style="text-align: left;"><div class="bash source-bash"><pre class="de1">grub-mkrescue <span class="re5">-o</span> os.iso loader_build<span class="sy0">/</span></pre></div></div>
+<h2> <span class="mw-headline" id="See_Also"> See Also </span></h2>
+<h3> <span class="mw-headline" id="Articles"> Articles </span></h3>
+<ul><li> <a rel="nofollow" class="external text" href="https://www.uclibc.org/docs/elf-64-gen.pdf">ELF-64 specification</a>
+</li><li> <a rel="nofollow" class="external text" href="https://www.gnu.org/software/grub/manual/multiboot/multiboot.html">Multiboot specification v0.6.96</a>
+</li></ul>
+
+<!-- 
+NewPP limit report
+Preprocessor node count: 552/1000000
+Post-expand include size: 2942/2097152 bytes
+Template argument size: 2282/2097152 bytes
+Expensive parser function count: 0/100
+-->
+
+<!-- Saved in parser cache with key wikidb:pcache:idhash:3998-0!*!0!!en!2!* and timestamp 20181116043527 -->
+</div>				<!-- /bodycontent -->
+								<!-- printfooter -->
+				<div class="printfooter">
+				Retrieved from "<a href="https://wiki.osdev.org/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;oldid=22613">https://wiki.osdev.org/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;oldid=22613</a>"				</div>
+				<!-- /printfooter -->
+												<!-- catlinks -->
+				<div id='catlinks' class='catlinks'><div id="mw-normal-catlinks"><a href="/Special:Categories" title="Special:Categories">Categories</a>: <ul><li><a href="/Category:Level_3_Tutorials" title="Category:Level 3 Tutorials">Level 3 Tutorials</a></li><li><a href="/Category:In_Progress" title="Category:In Progress">In Progress</a></li><li><a href="/Category:Tutorials" title="Category:Tutorials">Tutorials</a></li><li><a href="/Category:X86-64" title="Category:X86-64">X86-64</a></li></ul></div></div>				<!-- /catlinks -->
+												<div class="visualClear"></div>
+				<!-- debughtml -->
+								<!-- /debughtml -->
+			</div>
+			<!-- /bodyContent -->
+		</div>
+		<!-- /content -->
+		<!-- header -->
+		<div id="mw-head" class="noprint">
+			
+<!-- 0 -->
+<div id="p-personal" class="">
+	<h5>Personal tools</h5>
+	<ul>
+		<li id="pt-login"><a href="/index.php?title=Special:UserLogin&amp;returnto=Creating_a_64-bit_kernel_using_a_separate_loader" title="You are encouraged to log in; however, it is not mandatory [o]" accesskey="o">Log in</a></li>
+	</ul>
+</div>
+
+<!-- /0 -->
+			<div id="left-navigation">
+				
+<!-- 0 -->
+<div id="p-namespaces" class="vectorTabs">
+	<h5>Namespaces</h5>
+	<ul>
+					<li  id="ca-nstab-main" class="selected"><span><a href="/Creating_a_64-bit_kernel_using_a_separate_loader"  title="View the content page [c]" accesskey="c">Page</a></span></li>
+					<li  id="ca-talk" class="new"><span><a href="/index.php?title=Talk:Creating_a_64-bit_kernel_using_a_separate_loader&amp;action=edit&amp;redlink=1"  title="Discussion about the content page [t]" accesskey="t">Discussion</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-variants" class="vectorMenu emptyPortlet">
+		<h5><span>Variants</span><a href="#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+			</div>
+			<div id="right-navigation">
+				
+<!-- 0 -->
+<div id="p-views" class="vectorTabs">
+	<h5>Views</h5>
+	<ul>
+					<li id="ca-view" class="selected"><span><a href="/Creating_a_64-bit_kernel_using_a_separate_loader" >Read</a></span></li>
+					<li id="ca-viewsource"><span><a href="/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;action=edit"  title="This page is protected.&#10;You can view its source [e]" accesskey="e">View source</a></span></li>
+					<li id="ca-history" class="collapsible"><span><a href="/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;action=history"  title="Past revisions of this page [h]" accesskey="h">View history</a></span></li>
+			</ul>
+</div>
+
+<!-- /0 -->
+
+<!-- 1 -->
+<div id="p-cactions" class="vectorMenu emptyPortlet">
+	<h5><span>Actions</span><a href="#"></a></h5>
+	<div class="menu">
+		<ul>
+					</ul>
+	</div>
+</div>
+
+<!-- /1 -->
+
+<!-- 2 -->
+<div id="p-search">
+	<h5><label for="searchInput">Search</label></h5>
+	<form action="/index.php" id="searchform">
+		<input type='hidden' name="title" value="Special:Search"/>
+				<input type="search" name="search" title="Search OSDev Wiki [f]" accesskey="f" id="searchInput" />		<input type="submit" name="go" value="Go" title="Go to a page with this exact name if exists" id="searchGoButton" class="searchButton" />		<input type="submit" name="fulltext" value="Search" title="Search the pages for this text" id="mw-searchButton" class="searchButton" />			</form>
+</div>
+
+<!-- /2 -->
+			</div>
+		</div>
+		<!-- /header -->
+		<!-- panel -->
+			<div id="mw-panel" class="noprint">
+				<!-- logo -->
+					<div id="p-logo"><a style="background-image: url(/skins/common/images/osdev.png);" href="/Main_Page"  title="Visit the main page"></a></div>
+				<!-- /logo -->
+				
+<!-- navigation -->
+<div class="portal" id='p-navigation'>
+	<h5>Navigation</h5>
+	<div class="body">
+		<ul>
+			<li id="n-mainpage"><a href="/Main_Page" title="Visit the main page [z]" accesskey="z">Main Page</a></li>
+			<li id="n-portal"><a href="http://forum.osdev.org/" rel="nofollow" title="About the project, what you can do, where to find things">Forums</a></li>
+			<li id="n-FAQ"><a href="/Category:FAQ">FAQ</a></li>
+			<li id="n-OS-Projects"><a href="/Projects">OS Projects</a></li>
+			<li id="n-randompage"><a href="/Special:Random" title="Load a random page [x]" accesskey="x">Random page</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /navigation -->
+
+<!-- about -->
+<div class="portal" id='p-about'>
+	<h5>About</h5>
+	<div class="body">
+		<ul>
+			<li id="n-This-site"><a href="/OSDevWiki:About">This site</a></li>
+			<li id="n-Joining"><a href="/OSDevWiki:Joining">Joining</a></li>
+			<li id="n-Editing-help"><a href="/OSDevWiki:Editing">Editing help</a></li>
+			<li id="n-recentchanges"><a href="/Special:RecentChanges" title="A list of recent changes in the wiki [r]" accesskey="r">Recent changes</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /about -->
+
+<!-- SEARCH -->
+
+<!-- /SEARCH -->
+
+<!-- TOOLBOX -->
+<div class="portal" id='p-tb'>
+	<h5>Toolbox</h5>
+	<div class="body">
+		<ul>
+			<li id="t-whatlinkshere"><a href="/Special:WhatLinksHere/Creating_a_64-bit_kernel_using_a_separate_loader" title="A list of all wiki pages that link here [j]" accesskey="j">What links here</a></li>
+			<li id="t-recentchangeslinked"><a href="/Special:RecentChangesLinked/Creating_a_64-bit_kernel_using_a_separate_loader" title="Recent changes in pages linked from this page [k]" accesskey="k">Related changes</a></li>
+			<li id="t-specialpages"><a href="/Special:SpecialPages" title="A list of all special pages [q]" accesskey="q">Special pages</a></li>
+			<li><a href="/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;printable=yes" rel="alternate">Printable version</a></li>
+			<li id="t-permalink"><a href="/index.php?title=Creating_a_64-bit_kernel_using_a_separate_loader&amp;oldid=22613" title="Permanent link to this revision of the page">Permanent link</a></li>
+		</ul>
+	</div>
+</div>
+
+<!-- /TOOLBOX -->
+
+<!-- LANGUAGES -->
+
+<!-- /LANGUAGES -->
+			</div>
+		<!-- /panel -->
+		<!-- footer -->
+		<div id="footer">
+							<ul id="footer-info">
+											<li id="footer-info-lastmod"> This page was last modified on 9 September 2018, at 16:40.</li>
+											<li id="footer-info-viewcount">This page has been accessed 5,538 times.</li>
+									</ul>
+							<ul id="footer-places">
+											<li id="footer-places-privacy"><a href="/OSDev_Wiki:Privacy_policy" title="OSDev Wiki:Privacy policy">Privacy policy</a></li>
+											<li id="footer-places-about"><a href="/OSDev_Wiki:About" title="OSDev Wiki:About">About OSDev Wiki</a></li>
+											<li id="footer-places-disclaimer"><a href="/OSDev_Wiki:General_disclaimer" title="OSDev Wiki:General disclaimer">Disclaimers</a></li>
+									</ul>
+										<ul id="footer-icons" class="noprint">
+					<li id="footer-poweredbyico">
+						<a href="http://www.mediawiki.org/"><img src="/skins/common/images/poweredby_mediawiki_88x31.png" alt="Powered by MediaWiki" width="88" height="31" /></a>
+					</li>
+				</ul>
+						<div style="clear:both"></div>
+		</div>
+		<!-- /footer -->
+		<!-- fixalpha -->
+		<script type="text/javascript"> if ( window.isMSIE55 ) fixalpha(); </script>
+		<!-- /fixalpha -->
+		<script src="/load.php?debug=false&amp;lang=en&amp;modules=skins.vector&amp;only=scripts&amp;skin=vector&amp;*"></script>
+<script>if(window.mw){
+	mw.loader.load(["mediawiki.user", "mediawiki.util", "mediawiki.page.ready", "mediawiki.legacy.wikibits", "mediawiki.legacy.ajax"]);
+}
+</script>
+<script src="/load.php?debug=false&amp;lang=en&amp;modules=site&amp;only=scripts&amp;skin=vector&amp;*"></script>
+<script>if(window.mw){
+	mw.user.options.set({"ccmeonemails":0,"cols":80,"date":"default","diffonly":0,"disablemail":0,"disablesuggest":0,"editfont":"default","editondblclick":0,"editsection":1,"editsectiononrightclick":0,"enotifminoredits":0,"enotifrevealaddr":0,"enotifusertalkpages":1,"enotifwatchlistpages":0,"extendwatchlist":0,"externaldiff":0,"externaleditor":0,"fancysig":0,"forceeditsummary":0,"gender":"unknown","hideminor":0,"hidepatrolled":0,"highlightbroken":1,"imagesize":2,"justify":0,"math":1,"minordefault":0,"newpageshidepatrolled":0,"nocache":0,"noconvertlink":0,"norollbackdiff":0,"numberheadings":0,"previewonfirst":0,"previewontop":1,"quickbar":5,"rcdays":7,"rclimit":50,"rememberpassword":0,"rows":25,"searchlimit":20,"showhiddencats":0,"showjumplinks":1,"shownumberswatching":1,"showtoc":1,"showtoolbar":1,"skin":"vector","stubthreshold":0,"thumbsize":2,"underline":2,"uselivepreview":0,"usenewrc":0,"watchcreations":0,"watchdefault":0,"watchdeletion":0,"watchlistdays":3,"watchlisthideanons":0,
+	"watchlisthidebots":0,"watchlisthideliu":0,"watchlisthideminor":0,"watchlisthideown":0,"watchlisthidepatrolled":0,"watchmoves":0,"wllimit":250,"variant":"en","language":"en","searchNs0":true,"searchNs1":false,"searchNs2":false,"searchNs3":false,"searchNs4":false,"searchNs5":false,"searchNs6":false,"searchNs7":false,"searchNs8":false,"searchNs9":false,"searchNs10":false,"searchNs11":false,"searchNs12":false,"searchNs13":false,"searchNs14":false,"searchNs15":false});;mw.user.tokens.set({"editToken":"+\\","watchToken":false});;mw.loader.state({"user.options":"ready","user.tokens":"ready"});
+	
+	/* cache key: wikidb:resourceloader:filter:minify-js:4:19a4b18a9ac79a6b8c60b24af4668814 */
+}
+</script><!-- Served in 0.069 secs. -->
+	</body>
+</html>
