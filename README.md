@@ -16,8 +16,8 @@ Install bochs, bochs-x
 
 Run "bochs -f bochsrc" at root dir
 
-### Build
+## Build
 make
 
-### Clean
+## Clean
 make clean
