@@ -1,7 +1,7 @@
 
 AS := nasm
-CC := clang
-LD := lld
+CC := clang-6.0
+LD := lld-6.0
 DAS := llvm-objdump-6.0
 
 .DEFAULT_GOAL := all
@@ -104,7 +104,7 @@ $(ISO): $(TGT) $(GRUB_CFG)
 	mkdir -p $(OUT)/temp/boot/grub
 	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
 	cp $(TGT) $(OUT)/temp/
-	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
+	grub-mkrescue -d /usr/lib/grub/x86_64-efi -o $(ISO) $(OUT)/temp
 
 .PHONY: mkdir
 mkdir:
