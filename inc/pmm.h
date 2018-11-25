@@ -2,8 +2,12 @@
 
 #include "types.h"
 
-paddr_t pmalloc(void); // Allocate a physical page
-void pfree(paddr_t paddr); // Free physical page
+uint8 mem_state;
+uint32 freelist;
 
-void zero_out(paddr_t base, ui64_t offset);
+paddr pmalloc(uint32 size); // Allocate a physical page
+void pfree(paddr p); // Free physical page
+
+void mem_phase0(void);
+paddr alloc_ppage(uint32 n);
 

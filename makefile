@@ -18,7 +18,7 @@ C_FLAGS_ARCH_X86_64 := -mcmodel=kernel \
 C_FLAGS =   -x c \
 			-g \
             -c \
-            -O2 \
+            -O0 \
 			-std=c17 \
 			-Wall \
 			-Wextra \
@@ -71,7 +71,8 @@ DMP := $(OUT)/kernel.dmp
 C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
-		salloc.c
+		salloc.c \
+		pmm.c
 
 # ===============================
 # Add additional ASM source files here
@@ -95,7 +96,7 @@ $(ASM_OBJ): $(OUT)/%.asm.o : $(SRC)/%.asm
 	$(AS) $(AS_FLAGS) -o $@ $<
 
 $(TGT): $(C_OBJ) $(ASM_OBJ) $(LD_SCRIPT)
-	$(CC) $(LD_FLAGS) -o $@ $^
+	$(CC) $(LD_FLAGS) -o $@ $^ -v
 
 $(DMP): $(TGT)
 	$(DAS) $(DUMP_FLAGS) $< > $@
@@ -104,7 +105,7 @@ $(ISO): $(TGT) $(GRUB_CFG)
 	mkdir -p $(OUT)/temp/boot/grub
 	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
 	cp $(TGT) $(OUT)/temp/
-	grub-mkrescue -d /usr/lib/grub/x86_64-efi -o $(ISO) $(OUT)/temp
+	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
 
 .PHONY: mkdir
 mkdir:
@@ -117,3 +118,10 @@ clean:
 .PHONY: all
 all: mkdir $(TGT) $(DMP) $(ISO)
 
+.PHONY: debug
+debug: 
+	qemu-system-x86_64 -boot d -cdrom $(ISO)
+
+.PHONY: gdb
+gdb: 
+	qemu-system-x86_64 -s -boot d -cdrom $(ISO)
