@@ -16,8 +16,8 @@ alloc_ppage(uint32 n)
 	if (mem_state == 0) {
 		// TODO : This is init phase allocator. Branch off logic
 		uint64 offset = freelist * PAGESZ;
-		allocated = kernel_space - offset;
-		if (allocated == mem_mapped_io) return 0;
+		allocated = KERNEL_SPACE - offset;
+		if (allocated == MEM_MAPPED_IO) return 0;
 		freelist += n;
 		return allocated;
 	} else {

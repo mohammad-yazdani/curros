@@ -1,11 +1,10 @@
 /* System memory layout */
 
-#define user_space 0x0
-#define non_can 0x00007FFFFFFFFFFF
-#define kernel_space 0xFFFF800000000000
-#define mem_mapped_io 0xFFFF810000000000
-#define kernel_dynamic 0xFFFFFFFF80000000
-#define kernel_image 0xFFFFFFFFFFFFFFFF
-
-#define PAGESZ 4096
+#define USER_SPACE 			0x0
+#define NON_CAN 			0x00007FFFFFFFFFFF
+#define KERNEL_SPACE 		0xFFFF800000000000
+#define MEM_MAPPED_IO 		0xFFFF810000000000
+#define KERNEL_DYNAMIC 		0xFFFFFFFF80000000
+#define KERNEL_IMAGE 		0xFFFFFFFFFFFFFFFF
+#define PAGESZ 				0x1000
 

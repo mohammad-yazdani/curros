@@ -1,5 +1,7 @@
 #include "multiboot2.h"
 #include "pmm.h"
+#include "types.h"
+
 
 void kmain(void* multiboot_info)
 {
@@ -10,10 +12,17 @@ void kmain(void* multiboot_info)
 	mem_phase0();
 
 
-	paddr test_mem = 0;
-    while(!test_mem)
+	paddr pmem_test = 0;
+	uint32 * pptr_test = 0;
+    while(!pmem_test)
     { 
-    	test_mem = pmalloc(4096);
-    	(void)test_mem;
-    }
+    	pmem_test = pmalloc(4096);
+    	pptr_test = (uint32 *) pmem_test;
+
+    	// TODO : WRITE TEST
+    	*pptr_test = 12;
+    	*pptr_test = 10;
+    	uint32 intest = *pptr_test;
+    	(void)intest;
+    } 
 }
