@@ -3,6 +3,7 @@
 #include "clib.h"
 #include "memory_layout.h"
 #include "print.h"
+#include "error.h"
 
 /**
  * IDT Defns
@@ -36,7 +37,20 @@
 #define SEG_AVAILABLE (1ull << 52)
 #define SEG_32_BITS (1ull << 54)
 
+// APIC Interrupt vectors
+#define EDX_MASK_APIC (1 << 9)
+#define MSR_APIC_BASE (0x1b)
+#define MSR_MASK_APIC (11)
+
+// PIC defs
+#define PIC1_COMMAND    (0x20)
+#define PIC1_DATA    (PIC1_COMMAND+1)
+#define PIC2_COMMAND    (0xa0)
+#define PIC2_DATA    (PIC2_COMMAND+1)
+
+
 extern uint32 intr_stub_size;
+
 extern void intr_stub_start();
 
 static struct gdtr gdtptr;
@@ -80,9 +94,46 @@ static void write_gdt_desc(void *gdt, uint32 base, uint32 limit, uint64 attr)
     ((uint8 *) gdt)[7] = (uint8) ((seg_desc >> 56) & 0xFF);
 }
 
-static void init_apic()
+static void disable_pic()
 {
+    out_8(PIC1_COMMAND, 0x11);  // starts the initialization sequence (in cascade mode)
+    out_8(PIC2_COMMAND, 0x11);
 
+    out_8(PIC1_DATA, 32);                 // ICW2: Master PIC vector offset
+    out_8(PIC2_DATA, 40);                 // ICW2: Slave PIC vector offset
+
+    out_8(PIC1_DATA, 4);                  // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+    out_8(PIC2_DATA, 2);                  // ICW3: tell Slave PIC its cascade identity (0000 0010)
+
+    out_8(PIC1_DATA, 0x1);          // set their modes to 8086
+    out_8(PIC2_DATA, 0x1);
+
+    out_8(PIC1_DATA, 0xffff);
+    out_8(PIC2_DATA, 0xffff);
+
+}
+
+static int init_apic()
+{
+    uint32 eax = 1, ebx, ecx, edx;
+    cpuid(&eax, &ebx, &ecx, &edx);
+    if (!(edx & EDX_MASK_APIC))
+    {
+        return ENOSUPPORT;
+    }
+
+    disable_pic();
+
+    // configure APIC
+
+
+    // enable APIC
+    ecx = MSR_APIC_BASE;
+    read_msr(&ecx, &edx, &eax);
+    eax |= MSR_MASK_APIC;
+    write_msr(&ecx, &edx, &eax);
+
+    return 0;
 }
 
 void intr_init()
@@ -138,8 +189,8 @@ void *intr_dispatcher(uint32 vec, void *frame)
     }
     else
     {
-        kprintf("[PANIC] Interrupt %d has no handler. Frame: 0x%x\n", (uint64)vec, (uint64)frame);
-        while(1)
+        kprintf("[PANIC] Interrupt %d has no handler. Frame: 0x%x\n", (uint64) vec, (uint64) frame);
+        while (1)
         {
 
         }

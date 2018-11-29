@@ -20,8 +20,6 @@ void ASM_F flush_idt(void *idt_ptr);
 
 void ASM_F cpuid(uint32 *eax, uint32 *ebx, uint32 *ecx, uint32 *edx);
 
-#define MSR_IA32_APIC_BASE 0x1B
-
 void ASM_F read_msr(uint32 *ecx, uint32 *edx, uint32 *eax);
 
 void ASM_F write_msr(uint32 *ecx, uint32 *edx, uint32 *eax);
