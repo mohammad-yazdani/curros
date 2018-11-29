@@ -18,7 +18,7 @@ C_FLAGS_ARCH_X86_64 := -mcmodel=kernel \
 C_FLAGS =   -x c \
 			-g \
             -c \
-            -O2 \
+            -O0 \
 			-std=c17 \
 			-Wall \
 			-Wextra \
@@ -71,12 +71,17 @@ DMP := $(OUT)/kernel.dmp
 C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
-		salloc.c
+		salloc.c \
+		intr.c \
+		clib.c \
+		print.c
 
 # ===============================
 # Add additional ASM source files here
 # ===============================
-ASM_SRC := boot.asm
+ASM_SRC := boot.asm \
+		   cpu.asm \
+		   intr.asm
 
 
 # ===============================

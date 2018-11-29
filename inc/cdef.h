@@ -18,6 +18,8 @@ typedef _Bool bool;
 
 #define TRUE (1)
 #define FALSE (0)
+#define ASM_F __attribute__((cdecl))
+#define PACKED __attribute__((packed))
 
 #define PRAGMA_PACKED __attribute__((packed))
 
