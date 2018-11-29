@@ -21,12 +21,14 @@ C_FLAGS =   -x c \
             -O0 \
 			-std=c17 \
 			-Wall \
+			-Werror \
 			-Wextra \
 			-Wpedantic \
-			-Werror \
 			-ffreestanding \
 			-fno-pic \
 			-fno-stack-protector \
+			-Wno-error=int-to-pointer-cast \
+			-Wno-error=zero-length-array \
 			$(C_FLAGS_ARCH_X86_64) \
 			-I$(INC)/ \
 			$(C_FLAGS_$(MOD))
@@ -72,7 +74,8 @@ C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
 		salloc.c \
-		pmm.c
+		pmm.c \
+		elf.c
 
 # ===============================
 # Add additional ASM source files here

@@ -1,11 +1,25 @@
 #include "pmm.h"
 #include "memory_layout.h"
 
-void
-mem_phase0(void)
+uint64 KHEAP_LO = 0;
+uint64 KHEAP_HI = 0;
+
+uint8
+get_mem_phase()
 {
-	mem_state = 0;
-	freelist = 0;
+	return mem_state;
+}
+
+void
+mem_phase1(uint64 base, uint64 size)
+{
+	// Use this to get higher available RAM
+	mem_state = (base > 0);
+	if (mem_state) {
+		KHEAP_HI = base - size;
+		KHEAP_LO = base;
+		freelist = 1;
+	}
 }
 
 paddr
@@ -13,15 +27,20 @@ alloc_ppage(uint32 n)
 {
 	paddr allocated;
 	
-	if (mem_state == 0) {
+	if (mem_state == 1) {
 		// TODO : This is init phase allocator. Branch off logic
-		uint64 offset = freelist * PAGESZ;
-		allocated = KERNEL_SPACE - offset;
+		uint64 offset = freelist * (PAGESZ * n);
+		allocated = KHEAP_LO + offset;
 		if (allocated == MEM_MAPPED_IO) return 0;
 		freelist += n;
+		
+		// TODO : TEMP Zero out
+		uint64 * zp = (uint64 *) allocated;
+		*zp = 0;
+		
 		return allocated;
 	} else {
-		// TODO : Here goes the code for pmm after stage 0
+		// TODO : Here goes the code for pmm after stage 1
 		return 0;
 	}
 }
