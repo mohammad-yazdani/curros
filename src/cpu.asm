@@ -8,13 +8,32 @@ global in_8
 global in_16
 global in_32
 global read_msr
+global read_cr8
+global write_cr8
 global write_msr
 global cpuid
 global flush_gdt
 global flush_idt
 global cmp_xchg_32
 global inc_32
+global cli
+global sti
 
+read_cr8:
+mov rax, cr8
+ret
+
+write_cr8:
+mov cr8, rdi
+ret
+
+cli:
+cli
+ret
+
+sti:
+sti
+ret
 
 out_32:
 mov rdx,rdi

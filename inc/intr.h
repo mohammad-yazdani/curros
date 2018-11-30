@@ -1,5 +1,9 @@
 #pragma once
 #include "cdef.h"
+#include "cpu.h"
+
+#define READ_IRQ()  read_cr8()
+#define WRITE_IRQ(x)  write_cr8(x)
 
 #define NUM_IDT_DESC (256)
 #define NUM_GDT_DESC (5)
@@ -52,7 +56,7 @@ struct PACKED idt_desc
 // interrupt handlers should EOI
 typedef void* (*intr_handler)(uint32 vec, void* frame);
 
-void intr_init();
+int32 intr_init();
 void* ASM_F intr_dispatcher(uint32 vec, void *frame);
 void set_intr_handler(uint32 vec, intr_handler handler);
 

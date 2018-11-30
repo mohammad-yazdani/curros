@@ -40,7 +40,7 @@
 // APIC Interrupt vectors
 #define EDX_MASK_APIC (1 << 9)
 #define MSR_APIC_BASE (0x1b)
-#define MSR_MASK_APIC (11)
+#define MSR_MASK_APIC (1 << 11)
 
 // PIC defs
 #define PIC1_COMMAND    (0x20)
@@ -48,11 +48,26 @@
 #define PIC2_COMMAND    (0xa0)
 #define PIC2_DATA    (PIC2_COMMAND+1)
 
+#define INTR_VEC_TIMER    (50)
+#define INTR_VEC_SPURIOUS (255)
 
-extern uint32 intr_stub_size;
+#define APIC_REG_SPURIOUS (0xF0)
+#define APIC_REG_TIMER (0x320)
+#define APIC_REG_EOI (0xB0)
+#define APIC_REG_TIMER_DIV (0x3E0)
+#define APIC_REG_TIMER_INIT_CNT (0x380)
+#define APIC_REG_TIMER_CUR_CNT (0x390)
+#define APIC_REG_ID (0x20)
+#define APIC_REG_LINT0 (0x350)
+#define APIC_REG_LINT1 (0x360)
 
-extern void intr_stub_start();
+// base on 1Ghz CPU
+#define APIC_TIMER_INIT_CNT (10000000)
+#define REG_SPURIOUS_APIC_ENABLE (1 << 8)
 
+extern void* intr_stub_array[NUM_IDT_DESC];
+
+static uintptr apic_base;
 static struct gdtr gdtptr;
 static struct idtr idtptr;
 static struct gdt_desc gdt[NUM_GDT_DESC];
@@ -99,21 +114,30 @@ static void disable_pic()
     out_8(PIC1_COMMAND, 0x11);  // starts the initialization sequence (in cascade mode)
     out_8(PIC2_COMMAND, 0x11);
 
-    out_8(PIC1_DATA, 32);                 // ICW2: Master PIC vector offset
-    out_8(PIC2_DATA, 40);                 // ICW2: Slave PIC vector offset
+    out_8(PIC1_DATA, 32);  // ICW2: Master PIC vector offset
+    out_8(PIC2_DATA, 40);  // ICW2: Slave PIC vector offset
 
-    out_8(PIC1_DATA, 4);                  // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-    out_8(PIC2_DATA, 2);                  // ICW3: tell Slave PIC its cascade identity (0000 0010)
+    out_8(PIC1_DATA, 4);   // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+    out_8(PIC2_DATA, 2);   // ICW3: tell Slave PIC its cascade identity (0000 0010)
 
-    out_8(PIC1_DATA, 0x1);          // set their modes to 8086
+    out_8(PIC1_DATA, 0x1); // set their modes to 8086
     out_8(PIC2_DATA, 0x1);
 
-    out_8(PIC1_DATA, 0xffff);
-    out_8(PIC2_DATA, 0xffff);
-
+    out_8(PIC1_DATA, 0xff);
+    out_8(PIC2_DATA, 0xff);
 }
 
-static int init_apic()
+static void write_apic_reg(uint32 reg, uint32 val)
+{
+    *(uint32 *) (apic_base + reg) = val;
+}
+
+static uint32 read_apic_reg(uint32 reg)
+{
+    return *(uint32 *) (apic_base + reg);
+}
+
+static int32 init_apic()
 {
     uint32 eax = 1, ebx, ecx, edx;
     cpuid(&eax, &ebx, &ecx, &edx);
@@ -124,21 +148,43 @@ static int init_apic()
 
     disable_pic();
 
-    // configure APIC
-
-
-    // enable APIC
+    // hardware enable APIC
     ecx = MSR_APIC_BASE;
     read_msr(&ecx, &edx, &eax);
+    apic_base = (uintptr) (eax & 0xFFFF0000);
     eax |= MSR_MASK_APIC;
     write_msr(&ecx, &edx, &eax);
+    kprintf("APIC base address: 0x%x\n", (uint64)apic_base);
+    kprintf("Core id: %d\n", (uint64)read_apic_reg(APIC_REG_ID));
 
-    return 0;
+    // map spurious interrupt and software enable APIC
+    uint32 reg = read_apic_reg(APIC_REG_SPURIOUS);
+    write_apic_reg(APIC_REG_SPURIOUS, reg | REG_SPURIOUS_APIC_ENABLE);
+
+    // Mask LINT0 LINT1
+    reg = read_apic_reg(APIC_REG_LINT0);
+    write_apic_reg(APIC_REG_LINT0, reg | (1 << 16));
+    reg = read_apic_reg(APIC_REG_LINT1);
+    write_apic_reg(APIC_REG_LINT1, reg | (1 << 16));
+
+    kprintf("Initializing APIC timer...\n");
+
+    // configure APIC timer
+    write_apic_reg(APIC_REG_TIMER_DIV, 0xB); // 0x1011, divide by 1
+    write_apic_reg(APIC_REG_TIMER_INIT_CNT, APIC_TIMER_INIT_CNT);
+    write_apic_reg(APIC_REG_TIMER_CUR_CNT, APIC_REG_TIMER_INIT_CNT);
+    write_apic_reg(APIC_REG_TIMER, 0xFF020000 | INTR_VEC_TIMER); // periodic
+
+    // unblock all interrupts
+    write_cr8(0);
+
+    return ESUCCESS;
 }
 
-void intr_init()
+int32 intr_init()
 {
-    kprintf("Initializing GDT...\n");
+    int32 ret;
+    kprintf("Initializing interrupt...\n");
     // init GDT
     write_gdt_desc(&gdt[GDT_NULL], 0, 0, 0); // empty desc
     write_gdt_desc(&gdt[GDT_K_CODE], 0, 0xFFFFFFFF,
@@ -158,22 +204,24 @@ void intr_init()
     gdtptr.offset = (uint64) gdt - KERNEL_IMAGE_VADDR;
     flush_gdt(&gdtptr, SEL(GDT_K_CODE, 0, 0), SEL(GDT_K_DATA, 0, 0));
 
-    // init IDT
-    kprintf("Initializing IDT...\n");
     idtptr.offset = (uint64) idt - KERNEL_IMAGE_VADDR;
     idtptr.size = IDT_SIZE - 1;
     for (int i = 0; i < NUM_IDT_DESC; i++)
     {
-        write_idt_desc(&idt[i], (uintptr) intr_stub_start + i * intr_stub_size - KERNEL_IMAGE_VADDR,
+        write_idt_desc(&idt[i], (uintptr) intr_stub_array[i] - KERNEL_IMAGE_VADDR,
                        SEL(GDT_K_CODE, 0, 0),
                        GATE_DPL_0 | GATE_TYPE_INTERRUPT | GATE_PRESENT);
     }
     mem_set(intr_disp_tbl, 0, sizeof(intr_disp_tbl));
     flush_idt(&idtptr);
+    ret = init_apic();
 
-    // init IDT
-    kprintf("Initializing APIC...\n");
-    init_apic();
+    if(ret == ESUCCESS)
+    {
+        kprintf("Enabling interrupt...\n");
+        sti();
+    }
+    return ret;
 }
 
 void set_intr_handler(uint32 vec, intr_handler handler)
@@ -190,10 +238,12 @@ void *intr_dispatcher(uint32 vec, void *frame)
     else
     {
         kprintf("[PANIC] Interrupt %d has no handler. Frame: 0x%x\n", (uint64) vec, (uint64) frame);
-        while (1)
-        {
+    }
 
-        }
+    if(vec >= INTR_VEC_TIMER && vec != INTR_VEC_SPURIOUS)
+    {
+        // if it's delivered by local APIC, signal EOI
+        write_apic_reg(APIC_REG_EOI, 0);
     }
     return frame;
 }
