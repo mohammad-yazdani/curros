@@ -1,14 +1,26 @@
 /* Virtual memory management header */
 
-// TODO : struct for global kernel memory
-struct vmem {};
-// TODO : struct for page table
-struct vm_table {};
+#include "types.h"
+
+
 // TODO : struct for page
-struct vm_page {};
+typedef struct virtual_page {
+    
+} vm_page;
 
-int init_vm(struct vmem * kernmem);
+typedef struct vm_page_table {
+    uint64 num_page;
+    vm_page * pages;
+} vm_map;
 
-struct vm_page * kalloc();
-void kfree(struct vm_page * page);
+typedef struct vmm {
+    uint64 num_ent;
+    vm_map * entries;
+    // TODO : MORE entires 
+} vmem;
+
+void init_vm(vmem * kernmem);
+
+void * kalloc(usize size);
+void kfree(void * ptr);
 

@@ -20,11 +20,10 @@ mem_phase1(uint64 base, uint64 size)
 	// Use this to get higher available RAM
 	mem_state = (base > 0);
 	if (mem_state) {
-		KHEAP_HI = base - size;
+		KHEAP_HI = base + size;
 		KHEAP_LO = base;
 
-		// TODO : Freelist allocation hacks
-
+		// Freelist allocation hacks
 		freelist = pmalloc(4096);
 		lb_llist_init(freelist);
 
@@ -32,7 +31,7 @@ mem_phase1(uint64 base, uint64 size)
 		allocu * freelist_unit = (allocu *) (freelist_node + (sizeof(*freelist_node)));
 		freelist_unit->size = 1;
 		freelist_unit->status = 1;
-		// TODO : First allocation unit points to PMM data structure.
+		// First allocation unit points to PMM data structure.
 		freelist_unit->head = (paddr) freelist;
 		freelist_unit->end = (paddr) freelist_unit->head;
 		freelist_unit->end += PAGESZ;
@@ -41,7 +40,7 @@ mem_phase1(uint64 base, uint64 size)
 		
 		lb_llist_push_back(freelist, freelist_node);
 
-		// TODO : IF all is good, now we must have a llist of memory
+		// If all is good, now we must have a llist of memory
 		mem_state = 2;
 	}
 }
@@ -74,6 +73,8 @@ freelist_alloc(uint32 n)
 	new_alloc->head = last_alloc->end;
 	new_alloc->end = new_alloc->head;
 	new_alloc->end += (n * PAGESZ);
+
+	if (new_alloc->end >= KHEAP_HI) return 0; // Out of mem
 
 	new_node->data = new_alloc;
 

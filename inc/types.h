@@ -16,6 +16,7 @@ typedef uint8_t uint8;
 typedef int8_t int8;
 
 typedef _Bool bool;
+typedef uint64 usize;
 
 typedef uint64 paddr;
 typedef uint64 vaddr;
