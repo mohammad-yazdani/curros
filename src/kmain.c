@@ -49,13 +49,20 @@ void kmain(mbentry * mb)
 	next_entry = ((uint32) mb) + 8;
 	mtag * tag = (mtag *) next_entry;
 
-	while (!get_mem_phase()) {
+	while (get_mem_phase() != 2) {
 		tag += proccess_tag(tag);
 	}
 
-	paddr ppage = pmalloc(4096);
-	uint32 * pintpage = (uint32 *)ppage;
-	*pintpage = 12;
+	int32 * llmem1 = pmalloc(4096);
+	*llmem1 = 14;
+
+	int32 * llmem2 = pmalloc(4096);
+	*llmem2 = *llmem1 + 12;
+	(void)llmem2;
+
+	pfree((paddr) llmem2);
+	pfree((paddr) llmem1);
+
 	while (1) {}
 	/*
 	paddr pmem_test = 0;

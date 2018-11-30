@@ -6,6 +6,7 @@ struct llist_node
 {
     struct llist_node *prev;
     struct llist_node *next;
+    void * data;
 };
 
 struct llist
