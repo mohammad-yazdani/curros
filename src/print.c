@@ -10,6 +10,7 @@ static uint64 text_pos;
 void print_init()
 {
     text_pos = 0;
+    clear_screen();
 }
 
 static void

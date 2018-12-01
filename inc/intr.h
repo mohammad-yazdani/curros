@@ -56,6 +56,7 @@ struct PACKED idt_desc
 // interrupt handlers should EOI
 typedef void* (*intr_handler)(uint32 vec, void* frame);
 
+uint32 get_core();
 int32 intr_init();
 void* ASM_F intr_dispatcher(uint32 vec, void *frame);
 void set_intr_handler(uint32 vec, intr_handler handler);

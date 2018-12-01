@@ -4,14 +4,17 @@
 #include "print.h"
 #include "clib.h"
 #include "cpu.h"
+#include "thread.h"
+#include "proc.h"
 
 void kmain(void* multiboot_info)
 {
     UNREFERENCED(multiboot_info);
 
     print_init();
-    clear_screen();
     intr_init();
+
+    thread_init();
     while(1)
     {
 

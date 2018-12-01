@@ -247,3 +247,8 @@ void *intr_dispatcher(uint32 vec, void *frame)
     }
     return frame;
 }
+
+uint32 get_core()
+{
+    return 0;
+}
