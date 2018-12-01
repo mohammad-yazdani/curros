@@ -1,12 +1,30 @@
 #include "pmm.h"
 #include "memory_layout.h"
 
-uint64 KHEAP_LO = 0;
-uint64 KHEAP_HI = 0;
 
 uint8 mem_state = 0;
 memlist * freelist = 0x0;
 uint64 pmem_head = 0;
+
+uint64 KHEAP_LO = 0;
+uint64 KHEAP_HI = 0;
+
+uint64 MEM_LO = 0, LOSZ = 0;
+uint64 MEM_HI = 0, HISZ = 0;
+
+void set_mmap_low(uint64 low, uint64 size)
+{
+	MEM_LO = low;
+	LOSZ = size;
+}
+
+void set_mmap_high(uint64 high, uint64 size)
+{
+	MEM_HI = high;
+	HISZ = size;
+
+	mem_state = 1; // TODO : Cannot init pmm without full info
+}
 
 uint8
 get_mem_phase()
@@ -15,13 +33,11 @@ get_mem_phase()
 }
 
 void
-mem_phase1(uint64 base, uint64 size)
+pmm_init() 
 {
-	// Use this to get higher available RAM
-	mem_state = (base > 0);
 	if (mem_state) {
-		KHEAP_HI = base + size;
-		KHEAP_LO = base;
+		KHEAP_HI = MEM_HI;
+		KHEAP_LO = MEM_HI + HISZ;
 
 		// Freelist allocation hacks
 		freelist = pmalloc(4096);
@@ -33,8 +49,6 @@ mem_phase1(uint64 base, uint64 size)
 		freelist_unit->status = 1;
 		// First allocation unit points to PMM data structure.
 		freelist_unit->head = (paddr) freelist;
-		freelist_unit->end = (paddr) freelist_unit->head;
-		freelist_unit->end += PAGESZ;
 
 		freelist_node->data = freelist_unit;
 		
@@ -70,11 +84,9 @@ freelist_alloc(uint32 n)
 
 	new_alloc->size = n;
 	new_alloc->status = 1;
-	new_alloc->head = last_alloc->end;
-	new_alloc->end = new_alloc->head;
-	new_alloc->end += (n * PAGESZ);
+	new_alloc->head = last_alloc->head - (n * PAGESZ);
 
-	if (new_alloc->end >= KHEAP_HI) return 0; // Out of mem
+	if (new_alloc->head >= KHEAP_HI) return 0; // Out of mem
 
 	new_node->data = new_alloc;
 
@@ -91,7 +103,7 @@ alloc_ppage(uint32 n)
 	if (mem_state == 1) {
 		// TODO : This is init phase allocator. Branch off logic
 		uint64 offset = (pmem_head + 1) * (PAGESZ * n);
-		allocated = KHEAP_LO + offset;
+		allocated = KHEAP_LO - offset;
 		if (allocated == KHEAP_HI) return 0;
 		pmem_head += n;
 		

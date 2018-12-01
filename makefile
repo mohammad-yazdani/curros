@@ -64,6 +64,7 @@ LD_SCRIPT := linker.ld
 GRUB_CFG := grub.cfg
 
 TGT := $(OUT)/kernel.elf
+FILE := storage
 ISO := $(OUT)/curros.iso
 DMP := $(OUT)/kernel.dmp
 
@@ -75,7 +76,8 @@ C_SRC := atree.c \
 	    llist.c \
 		salloc.c \
 		pmm.c \
-		elf.c
+		elf.c \
+		vmm.c
 
 # ===============================
 # Add additional ASM source files here
@@ -108,6 +110,7 @@ $(ISO): $(TGT) $(GRUB_CFG)
 	mkdir -p $(OUT)/temp/boot/grub
 	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
 	cp $(TGT) $(OUT)/temp/
+	cp $(FILE) $(OUT)/temp/
 	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
 
 .PHONY: mkdir
@@ -127,4 +130,5 @@ debug:
 
 .PHONY: gdb
 gdb: 
-	qemu-system-x86_64 -s -boot d -cdrom $(ISO)
+	qemu-system-x86_64 -s -boot d -cdrom $(ISO) -fw_cfg name=opt/com.name.domain.your.example,string=1
+

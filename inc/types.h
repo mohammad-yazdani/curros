@@ -20,6 +20,7 @@ typedef uint64 usize;
 
 typedef uint64 paddr;
 typedef uint64 vaddr;
+typedef uint64 usize;
 
 #define TRUE (1)
 #define FALSE (0)
