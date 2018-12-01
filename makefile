@@ -75,7 +75,8 @@ C_SRC := atree.c \
 	    llist.c \
 		salloc.c \
 		pmm.c \
-		elf.c
+		elf.c \
+		vmm.c
 
 # ===============================
 # Add additional ASM source files here

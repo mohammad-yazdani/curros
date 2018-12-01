@@ -10,14 +10,15 @@ typedef struct allocation_unit {
     paddr head;
     uint64 size;
     uint8 status;
-    paddr end;
 } allocu;
 
 void * pmalloc(uint32 size); // Allocate a physical page
 void pfree(paddr p); // Free physical page
 
 // TODO : Setup methods
-void mem_phase1(uint64 base, uint64 size);
+void pmm_init();
 uint8 get_mem_phase();
+void set_mmap_low(uint64 low, uint64 size);
+void set_mmap_high(uint64 high, uint64 size);
 
 
