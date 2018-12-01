@@ -12,15 +12,6 @@
 
 #define SWAP(a, b, T) do { T temp = *(a); *(a) = *(b); *(b) = temp; } while(0);
 
-uint32
-lb_rand(void);
-
-void
-lb_srand(uint32 _seed);
-
-void
-lb_mrand(uint32 max);
-
 uint64
 str_len(char const *str);
 
@@ -52,3 +43,6 @@ bit_field_mask(uint32 low, uint32 high)
 {
     return ~(~(uint64) 0 << high << 1) << low;
 }
+
+void
+poor_sleep(uint32 dat);

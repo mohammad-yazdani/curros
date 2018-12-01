@@ -34,14 +34,6 @@ align MULTIBOOT_INFO_ALIGN
     dd MULTIBOOT_TAG_TYPE_ACPI_NEW
 ;====================
 align MULTIBOOT_INFO_ALIGN
-    dw MULTIBOOT_HEADER_TAG_FRAMEBUFFER; type=5
-    dw 0 ; flag
-    dw 20 ; size
-    dd 0 ; width
-    dd 0 ; depth
-    dd 0 ; height
-;====================
-align MULTIBOOT_INFO_ALIGN
     dw MULTIBOOT_HEADER_TAG_MODULE_ALIGN; type=6
     dw 0 ; flag
     dd 8 ; size
@@ -73,7 +65,6 @@ sys_entry:
     mov eax, cr0          ; Set the A-register to control register 0.
     and eax, ~(1 << 31) & 0xFFFFFFFF   ; Clear the PG-bit, which is bit 31, and hack to get rid of warning
     mov cr0, eax          ; Set control register 0 to the A-register.
-    xchg bx, bx
     ; point the first PML4 entry to the identity pdpt
     mov eax, GET_PADDR(init_pml4)
     mov dword [eax], GET_PADDR(init_pdpt_iden) + 11b ; write the lower bits, higher = 0
@@ -97,8 +88,7 @@ sys_entry:
     add eax, GET_PDPT(KERNEL_IMAGE_VADDR) * 8
     mov ebx, 10000011b ; R/W + SU + 1G page
     mov dword [eax], ebx
-    
-    xchg bx,bx
+
 
     ; enable PAE
     mov eax, cr4                 ; Set the A-register to control register 4.
@@ -125,7 +115,6 @@ sys_entry:
     ; load the long mode GDT
     lgdt [GET_PADDR(init_gdt.ptr)]
 
-    xchg bx,bx
 	; switch to long mode
     jmp init_gdt.code:GET_PADDR(sys_entry_64)
 .end:

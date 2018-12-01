@@ -13,11 +13,14 @@ typedef uint16_t uint16;
 typedef int16_t int16;
 typedef uint8_t uint8;
 typedef int8_t int8;
+typedef size_t usize;
 
 typedef _Bool bool;
 
 #define TRUE (1)
 #define FALSE (0)
+#define ASM_F __attribute__((cdecl))
+#define PACKED __attribute__((packed))
 
 #define PRAGMA_PACKED __attribute__((packed))
 

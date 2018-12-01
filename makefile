@@ -73,7 +73,9 @@ DMP := $(OUT)/kernel.dmp
 C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
-		salloc.c \
+		intr.c \
+		clib.c \
+		print.c
 		pmm.c \
 		elf.c \
 		vmm.c
@@ -81,7 +83,9 @@ C_SRC := atree.c \
 # ===============================
 # Add additional ASM source files here
 # ===============================
-ASM_SRC := boot.asm
+ASM_SRC := boot.asm \
+		   cpu.asm \
+		   intr.asm
 
 
 # ===============================
