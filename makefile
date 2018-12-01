@@ -1,7 +1,7 @@
 
 AS := nasm
-CC := clang
-LD := lld
+CC := clang-6.0
+LD := lld-6.0
 DAS := llvm-objdump-6.0
 
 .DEFAULT_GOAL := all
@@ -21,12 +21,14 @@ C_FLAGS =   -x c \
             -O0 \
 			-std=c17 \
 			-Wall \
+			-Werror \
 			-Wextra \
 			-Wpedantic \
-			-Werror \
 			-ffreestanding \
 			-fno-pic \
 			-fno-stack-protector \
+			-Wno-error=int-to-pointer-cast \
+			-Wno-error=zero-length-array \
 			$(C_FLAGS_ARCH_X86_64) \
 			-I$(INC)/ \
 			$(C_FLAGS_$(MOD))
@@ -71,10 +73,12 @@ DMP := $(OUT)/kernel.dmp
 C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
-		salloc.c \
 		intr.c \
 		clib.c \
 		print.c
+		pmm.c \
+		elf.c \
+		vmm.c
 
 # ===============================
 # Add additional ASM source files here
@@ -100,7 +104,7 @@ $(ASM_OBJ): $(OUT)/%.asm.o : $(SRC)/%.asm
 	$(AS) $(AS_FLAGS) -o $@ $<
 
 $(TGT): $(C_OBJ) $(ASM_OBJ) $(LD_SCRIPT)
-	$(CC) $(LD_FLAGS) -o $@ $^
+	$(CC) $(LD_FLAGS) -o $@ $^ -v
 
 $(DMP): $(TGT)
 	$(DAS) $(DUMP_FLAGS) $< > $@
@@ -122,3 +126,10 @@ clean:
 .PHONY: all
 all: mkdir $(TGT) $(DMP) $(ISO)
 
+.PHONY: debug
+debug: 
+	qemu-system-x86_64 -boot d -cdrom $(ISO)
+
+.PHONY: gdb
+gdb: 
+	qemu-system-x86_64 -s -boot d -cdrom $(ISO)
