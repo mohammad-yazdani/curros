@@ -12,4 +12,6 @@ struct pcb
     struct spin_lock lock;
 };
 
-int32 process_create(void* entry, uint32* proc_id);
+int32 proc_create(void* entry, uint32* proc_id);
+
+void proc_init();

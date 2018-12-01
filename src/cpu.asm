@@ -14,10 +14,20 @@ global write_msr
 global cpuid
 global flush_gdt
 global flush_idt
-global cmp_xchg_32
-global inc_32
+global cmpxchg_32
+global xinc_32
 global cli
 global sti
+global read_cr3
+global write_cr3
+
+read_cr3:
+mov rax, cr3
+ret
+
+write_cr3:
+mov cr3, rdi
+ret
 
 read_cr8:
 mov rax, cr8
@@ -137,26 +147,22 @@ ret
 
 flush_gdt:
 push rbp
-mov rbp,rsp
+mov rbp, rsp
 lgdt [rdi]
-;reload cs
 
+;reload cs
 push rdx ; data_slct : ss
 push rbp ; rsp
-
 pushfq
-pop rax
-push rax ; eflags
-
 push rsi ; cs
 mov rax, .reload
 push rax ;rip
 iretq
 .reload:
-mov es,dx
-mov fs,dx
-mov gs,dx
-mov ds,dx
+mov es,rdx
+mov fs,rdx
+mov gs,rdx
+mov ds,rdx
 pop rbp
 ret
 

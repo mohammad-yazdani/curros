@@ -14,6 +14,8 @@ int32 process_init()
 
 int32 process_create(void *entry, uint32 *proc_id)
 {
+    UNREFERENCED(entry);
+    UNREFERENCED(proc_id);
     // allocate pcb and stuff
-    return ESUCCESS;
+    return ENOMEM;
 }

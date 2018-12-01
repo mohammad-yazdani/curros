@@ -3,6 +3,7 @@
 #include "clib.h"
 #include "memory_layout.h"
 #include "print.h"
+#include "paging.h"
 #include "error.h"
 
 /**
@@ -151,7 +152,7 @@ static int32 init_apic()
     // hardware enable APIC
     ecx = MSR_APIC_BASE;
     read_msr(&ecx, &edx, &eax);
-    apic_base = (uintptr) (eax & 0xFFFF0000);
+    apic_base = (uintptr)R_PADDR(eax & 0xFFFF0000);
     eax |= MSR_MASK_APIC;
     write_msr(&ecx, &edx, &eax);
     kprintf("APIC base address: 0x%x\n", (uint64)apic_base);
@@ -184,7 +185,7 @@ static int32 init_apic()
 int32 intr_init()
 {
     int32 ret;
-    kprintf("Initializing interrupt...\n");
+    kprintf("Initializing interrupts...\n");
     // init GDT
     write_gdt_desc(&gdt[GDT_NULL], 0, 0, 0); // empty desc
     write_gdt_desc(&gdt[GDT_K_CODE], 0, 0xFFFFFFFF,
@@ -195,20 +196,21 @@ int32 intr_init()
                    SEG_TYPE_DATA_RW); // kernel data
     write_gdt_desc(&gdt[GDT_U_CODE], 0, 0xFFFFFFFF,
                    SEG_LONG | SEG_DPL_3 | SEG_PRESENT | SEG_GRANULARITY | SEG_CODE_DATA |
-                   SEG_TYPE_DATA_RW); // user code
+                   SEG_TYPE_CODE_XR); // user code
     write_gdt_desc(&gdt[GDT_U_DATA], 0, 0xFFFFFFFF,
                    SEG_LONG | SEG_DPL_3 | SEG_PRESENT | SEG_GRANULARITY | SEG_CODE_DATA |
                    SEG_TYPE_DATA_RW); // user data
 
     gdtptr.size = GDT_SIZE - 1;
-    gdtptr.offset = (uint64) gdt - KERNEL_IMAGE_VADDR;
+    gdtptr.offset = (uintptr)gdt;
+    BOCHS_BREAK;
     flush_gdt(&gdtptr, SEL(GDT_K_CODE, 0, 0), SEL(GDT_K_DATA, 0, 0));
 
-    idtptr.offset = (uint64) idt - KERNEL_IMAGE_VADDR;
+    idtptr.offset = (uintptr)idt;
     idtptr.size = IDT_SIZE - 1;
     for (int i = 0; i < NUM_IDT_DESC; i++)
     {
-        write_idt_desc(&idt[i], (uintptr) intr_stub_array[i] - KERNEL_IMAGE_VADDR,
+        write_idt_desc(&idt[i], (uintptr) intr_stub_array[i],
                        SEL(GDT_K_CODE, 0, 0),
                        GATE_DPL_0 | GATE_TYPE_INTERRUPT | GATE_PRESENT);
     }
@@ -229,15 +231,15 @@ void set_intr_handler(uint32 vec, intr_handler handler)
     intr_disp_tbl[vec] = handler;
 }
 
-void *intr_dispatcher(uint32 vec, void *frame)
+void intr_dispatcher(uint32 vec, struct intr_frame *frame)
 {
     if (intr_disp_tbl[vec] != NULL)
     {
-        frame = intr_disp_tbl[vec](vec, frame);
+        intr_disp_tbl[vec](vec, frame);
     }
     else
     {
-        kprintf("[PANIC] Interrupt %d has no handler. Frame: 0x%x\n", (uint64) vec, (uint64) frame);
+        kprintf("[PANIC] Interrupt %d has no handler. RIP: 0x%x\n", (uint64) vec, (uint64) frame->rip);
     }
 
     if(vec >= INTR_VEC_TIMER && vec != INTR_VEC_SPURIOUS)
@@ -245,7 +247,6 @@ void *intr_dispatcher(uint32 vec, void *frame)
         // if it's delivered by local APIC, signal EOI
         write_apic_reg(APIC_REG_EOI, 0);
     }
-    return frame;
 }
 
 uint32 get_core()

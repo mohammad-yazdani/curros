@@ -1,4 +1,5 @@
 #pragma once
+
 #include "cdef.h"
 #include "cpu.h"
 
@@ -51,13 +52,45 @@ struct PACKED idt_desc
     uint32 reserved;
 };
 
+struct PACKED intr_frame
+{
+    uint64 gs;
+    uint64 fs;
+    uint64 es;
+    uint64 ds;
+    uint64 r15;
+    uint64 r14;
+    uint64 r13;
+    uint64 r12;
+    uint64 r11;
+    uint64 r10;
+    uint64 r9;
+    uint64 r8;
+    uint64 rsi;
+    uint64 rdi;
+    uint64 rbp;
+    uint64 rdx;
+    uint64 rcx;
+    uint64 rbx;
+    uint64 rax;
+    uint64 error_code;
+    uint64 rip;
+    uint64 cs;
+    uint64 rflags;
+    uint64 rsp;
+    uint64 ss;
+};
+
 
 // returns the new exception frame pointer
 // interrupt handlers should EOI
-typedef void* (*intr_handler)(uint32 vec, void* frame);
+typedef void (*intr_handler)(uint32 vec, struct intr_frame *frame);
 
 uint32 get_core();
+
 int32 intr_init();
-void* ASM_F intr_dispatcher(uint32 vec, void *frame);
+
+void ASM_F intr_dispatcher(uint32 vec, struct intr_frame *frame);
+
 void set_intr_handler(uint32 vec, intr_handler handler);
 

@@ -1,4 +1,6 @@
-#include "types.h"
+#pragma once
+
+#include "cdef.h"
 
 # define ELF_NIDENT	16
 

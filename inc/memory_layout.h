@@ -1,16 +1,13 @@
 /* System memory layout */
-#define US_START            0x0
-#define US_END   			0x7FFFFFFFFFFF0000
-#define US_TOTAL            0x0000800000000000
+#pragma once
 
+#define K_START     		0xFFFF800000000000
+#define K_PMAP_VADDR               0xFFFF800000000000
+#define K_DYNAMIC 		0xFFFFFFFF00000000
+#define K_DYN_END          0xFFFFFFFF70000000
+#define K_IMAGE 		0xFFFFFFFF80000000
 
-#define KS_START     		0xFFFF800000000000
+#define PAGE_SIZE 				0x1000
 
-#define PMMAP               0xFFFF800000000000
-#define MEM_MAPPED_IO 		0xFFFF810000000000
-#define KERN_DYNAMIC 		0xFFFFFFFF83000000
-#define KERNEL_IMAGE 		0xFFFFFFFF80000000
-#define VMEND 		        0xFFFFFFFFBFFFFF00
-
-#define PAGESZ 				0x1000
-
+#define R_PADDR(paddr) (void*)((paddr) + K_PMAP_VADDR)
+#define IS_KERN_SPACE(vaddr) (((uintptr)vaddr) < K_START)

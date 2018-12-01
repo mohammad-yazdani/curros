@@ -1,7 +1,8 @@
 #include "print.h"
 #include "clib.h"
+#include "memory_layout.h"
 
-#define FBUF (0xb8000)
+#define FBUF (uintptr)R_PADDR(0xb8000)
 #define GET_ROW(pos) ((pos) / 80)
 #define GET_POS(row, col) ((row) * 80 + (col))
 
@@ -16,7 +17,7 @@ void print_init()
 static void
 print_scroll(void)
 {
-    mem_mv((void *) (FBUF + GET_POS(1, 0) * 2), (void *) (FBUF + GET_POS(0, 0) * 2), (80 * 24) * 2);
+    mem_mv((void*)(FBUF + GET_POS(1, 0) * 2), (void *) (FBUF + GET_POS(0, 0) * 2), (80 * 24) * 2);
 }
 
 static void

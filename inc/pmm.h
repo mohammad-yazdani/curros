@@ -1,7 +1,10 @@
 /* Header file for physical memory management */
+#pragma once
 
-#include "types.h"
+#include "cdef.h"
 #include "llist.h"
+
+typedef uintptr paddr;
 
 typedef struct llist memlist;
 typedef struct llist_node memnode;

@@ -33,15 +33,9 @@ mem_set(void *src, uint8 val, uint64 size);
 
 
 static inline uint64
-bit_mask(uint32 bit)
-{
-    return (uint64) 1 << bit;
-}
-
-static inline uint64
 bit_field_mask(uint32 low, uint32 high)
 {
-    return ~(~(uint64) 0 << high << 1) << low;
+    return ~((uint64)-1 << (high - low + 1)) << low;
 }
 
 void

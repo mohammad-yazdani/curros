@@ -1,7 +1,7 @@
 #include "thread.h"
 #include "error.h"
 #include "proc.h"
-#include "alloc.h"
+#include "vmm.h"
 #include "cpu.h"
 
 enum
@@ -17,11 +17,15 @@ static struct llist thread_list;
 
 void thread_exit(int32 code)
 {
-
+    UNREFERENCED(code);
 }
 
 int32 thread_create(void (*func)(void *), void *args, uint32 *tid)
 {
+    UNREFERENCED(func);
+    UNREFERENCED(args);
+    UNREFERENCED(tid);
+
     struct tcb *tcb = kalloc(sizeof(struct tcb));
 
     if (tcb == NULL)
@@ -34,13 +38,15 @@ int32 thread_create(void (*func)(void *), void *args, uint32 *tid)
     tcb->exit_code = 0;
     tcb->state = THREAD_STATE_RDY;
     tcb->proc = cur_thread->proc;
-    tcb->rsp0 = ;
+
+    return ENOMEM;
 }
 
 int32 thread_init()
 {
-    next_thread = NULL;
     cur_thread = NULL;
+    lb_llist_init(&thread_list);
+    return ENOMEM;
 }
 
 struct tcb *get_cur_thread()

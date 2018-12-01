@@ -1,3 +1,5 @@
+%include "asm.inc"
+
 extern intr_dispatcher
 global intr_stub_array
 
@@ -264,16 +266,31 @@ dq intr_stub_255
 section .text
 bits 64
 
+%macro decl_err_intr_stub 1
+intr_stub_%1:
+; save context
+PUSH_REGS
+push qword %1
+jmp intr_stub
+%endmacro
+
 %macro decl_intr_stub 1
 intr_stub_%1:
-mov rdi, %1
+; push dummy error code to have consistent frame
+push qword 0
+PUSH_REGS
+push qword %1
 jmp intr_stub
 %endmacro
 
 intr_stub:
+pop rdi
 mov rsi, rsp
 call intr_dispatcher
-mov rsp, rax
+; restore registers
+POP_REGS
+; skip error code
+add rsp, 8
 iretq
 
 intr_stub_start:
@@ -285,16 +302,16 @@ decl_intr_stub 4
 decl_intr_stub 5
 decl_intr_stub 6
 decl_intr_stub 7
-decl_intr_stub 8
+decl_err_intr_stub 8
 decl_intr_stub 9
-decl_intr_stub 10
-decl_intr_stub 11
-decl_intr_stub 12
-decl_intr_stub 13
-decl_intr_stub 14
+decl_err_intr_stub 10
+decl_err_intr_stub 11
+decl_err_intr_stub 12
+decl_err_intr_stub 13
+decl_err_intr_stub 14
 decl_intr_stub 15
 decl_intr_stub 16
-decl_intr_stub 17
+decl_err_intr_stub 17
 decl_intr_stub 18
 decl_intr_stub 19
 decl_intr_stub 20
