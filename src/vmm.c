@@ -15,10 +15,17 @@ vmem * kmem = 0x0;
 vm_node * global_list = 0x0;
 
 paddr
-get_paddr(vaddr v)
+get_vaddr(vaddr v)
 {
     paddr p = v - KERNEL_IMAGE;
     return p;
+}
+
+uint64
+get_index(vaddr address)
+{
+    vaddr offset = address - KERN_DYNAMIC;
+    return (offset / PAGESZ);
 }
 
 vm_node *
@@ -38,6 +45,7 @@ get_alloc_node()
     } else {
         alloc = kalloc(sizeof(vm_node));
         atom = kalloc(sizeof(vm_atom));
+        alloc->data = atom;
     }
     
     return alloc;
@@ -192,6 +200,41 @@ kalloc(usize size)
 void 
 kfree(void * ptr)
 {
-    (void)ptr;
+    vaddr num_ptr = (vaddr) ptr;
+    uint64 index = get_index(num_ptr);
+
+    vm_object * page = &(kmem->pages[index]);
+    usize offset = num_ptr - page->address;
+    
+    vm_node * head = page->allocs.head;
+
+    while (head) {
+        vm_atom * atom = head->data;
+        if (atom->offset == offset && atom->page_ptr == page) {
+            page->free += atom->size;
+            
+            vm_node * prev = head->prev;
+            if (!prev) {
+                page->allocs.head = head->next;
+            } else {
+                prev->next = head->next;
+            }
+            
+            lb_llist_remove_by_ref(&(page->allocs), head);
+
+            if (page->allocs.size == 0) {
+                page->allocs.head = 0x0;
+                page->allocs.tail = 0x0;
+            }
+
+            if (kmem->global_alloc->size >= 320) {
+                kfree(atom);
+                kfree(head);
+            }
+
+            break;
+        }
+        head = head->next;
+    }
 }
 

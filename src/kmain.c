@@ -85,6 +85,7 @@ vmm_test()
 	ds * dummy = kalloc(sizeof(ds));
 	dummy->test0 = 34;
 	dummy->test1 = 12234322;
+	*test_int = 345;
 	
 	kfree(dummy);
 	kfree(test_int);
@@ -99,7 +100,7 @@ void kmain(mbentry * mb)
 
 	init_vm();
 	vmm_test();
-	
+
 	// Here is the first page table
 
 
