@@ -86,7 +86,7 @@ freelist_alloc(uint32 n)
 	new_alloc->status = 1;
 	new_alloc->head = last_alloc->head - (n * PAGESZ);
 
-	if (new_alloc->head >= KHEAP_HI) return 0; // Out of mem
+	if (new_alloc->head < KHEAP_HI) return 0; // Out of mem
 
 	new_node->data = new_alloc;
 

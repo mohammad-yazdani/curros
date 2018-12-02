@@ -9,14 +9,17 @@ echo "Building USER APPS"
 cd ./user 
 make
 cp ./out/hello_hell.elf ../storage
-echo "USER APPS built with code {$?}"
+
+usuc="USER APPS built with [CODE $?]"
 
 cd ..
 echo "Building KERNEL"
 make
-echo "KERNEL built with code {$?}"
-
-
-
-
+echo ""
+echo "======================================================="
+echo "BUILD SUMMARY:"
+echo "KERNEL built with [CODE $?]"
+echo ${usuc}
+echo "======================================================="
+echo ""
 
