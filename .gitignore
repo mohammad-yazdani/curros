@@ -1,1 +1,7 @@
 out/
+debug.sh
+sync.sh
+compile_remote.sh
+storage
+.DS_Store
+

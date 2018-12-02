@@ -1,7 +1,0 @@
-
-llvm-objdump -x86-asm-syntax=intel -disassemble -r -t -triple=x86_64-pc-none-elf -print-imm-hex out/kernel.elf > out/kernel.dmp
-
-ld.lld -z relro --hash-style=gnu --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o out/kernel.elf -L/usr/bin/../lib/gcc/x86_64-linux-gnu/7.3.0 -L/usr/bin/../lib/gcc/x86_64-linux-gnu/7.3.0/../../../x86_64-linux-gnu -L/lib/x86_64-linux-gnu -L/lib/../lib64 -L/usr/lib/x86_64-linux-gnu -L/usr/bin/../lib/gcc/x86_64-linux-gnu/7.3.0/../../.. -L/usr/lib/llvm-6.0/bin/../lib -L/lib -L/usr/lib -T linker.ld --fatal-warnings out/atree.c.o out/kmain.c.o out/llist.c.o out/salloc.c.o out/pmm.c.o out/boot.asm.o linker.ld
-
-/usr/bin/clang -fuse-ld=lld -nostdlib -Wl,-T,linker.ld -Wl,--fatal-warnings -o out/kernel.elf out/atree.c.o out/kmain.c.o out/llist.c.o out/salloc.c.o out/pmm.c.o out/boot.asm.o linker.ld -v
-

@@ -6,8 +6,7 @@ DAS := llvm-objdump-6.0
 
 .DEFAULT_GOAL := all
 
-C_FLAGS_ARCH_X86_64 := -mcmodel=kernel \
-                  -target x86_64-pc-none-elf \
+C_FLAGS_ARCH_X86_64 := -target x86_64-pc-none-elf \
                   -mno-red-zone \
                   -mno-mmx \
                   -mno-sse \
@@ -33,14 +32,6 @@ C_FLAGS =   -x c \
 			-I$(INC)/ \
 			$(C_FLAGS_$(MOD))
 
-AS_FLAGS =  -w+all \
-			-w+error \
-			-f elf64 \
-			-F dwarf \
-			-g \
-			-I$(INC)/ \
-			$(AS_FLAGS_$(MOD))
-
 DUMP_FLAGS = -x86-asm-syntax=intel \
 			 -disassemble \
 			 -r \
@@ -50,69 +41,39 @@ DUMP_FLAGS = -x86-asm-syntax=intel \
 
 LD_FLAGS =  -fuse-ld=$(LD) \
 			-nostdlib \
-			-Wl,-T,$(LD_SCRIPT) \
+			-Wl, \
 			-Wl,--fatal-warnings
 
 # ===============================
 # HERE COMES file definitions
 # ===============================
 
-SRC := src
-INC := inc
+SRC := .
 OUT := out
-LD_SCRIPT := linker.ld
-GRUB_CFG := grub.cfg
-
-TGT := $(OUT)/kernel.elf
-FILE := storage
-ISO := $(OUT)/curros.iso
-DMP := $(OUT)/kernel.dmp
 
 # ===============================
 # Add additional c source files here
 # ===============================
-C_SRC := atree.c \
-	    kmain.c \
-	    llist.c \
-		salloc.c \
-		pmm.c \
-		vmm.c \
-		multiboot2.c \
-		elf64.c
-
-# ===============================
-# Add additional ASM source files here
-# ===============================
-ASM_SRC := boot.asm
-
+C_SRC := hello_hell.c
+TGT := $(OUT)/hello_hell.elf
 
 # ===============================
 # Compilation rules
 # ===============================
 C_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(C_SRC)))
 
-ASM_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(ASM_SRC)))
-
 $(info $(C_OBJ))
 
 $(C_OBJ): $(OUT)/%.c.o : $(SRC)/%.c
 	$(CC) $(C_FLAGS) -o $@ $<
 
-$(ASM_OBJ): $(OUT)/%.asm.o : $(SRC)/%.asm
-	$(AS) $(AS_FLAGS) -o $@ $<
-
-$(TGT): $(C_OBJ) $(ASM_OBJ) $(LD_SCRIPT)
-	$(CC) $(LD_FLAGS) -o $@ $^ -v
+$(TGT): $(C_OBJ)
+	$(CC) -o $@ $^ -v
 
 $(DMP): $(TGT)
 	$(DAS) $(DUMP_FLAGS) $< > $@
 
-$(ISO): $(TGT) $(GRUB_CFG)
-	mkdir -p $(OUT)/temp/boot/grub
-	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
-	cp $(TGT) $(OUT)/temp/
-	cp $(FILE) $(OUT)/temp/
-	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
+
 
 .PHONY: mkdir
 mkdir:
@@ -123,13 +84,5 @@ clean:
 	rm -rf $(OUT)
 
 .PHONY: all
-all: mkdir $(TGT) $(DMP) $(ISO)
-
-.PHONY: debug
-debug: 
-	qemu-system-x86_64 -boot d -cdrom $(ISO)
-
-.PHONY: gdb
-gdb: 
-	qemu-system-x86_64 -s -boot d -cdrom $(ISO) 
+all: mkdir $(TGT) $(DMP)
 

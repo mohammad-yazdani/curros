@@ -19,6 +19,10 @@
       *  IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
       */
      
+     /* CurrOS */
+     #include "cdef.h"
+     /* CurrOS */
+
      #ifndef MULTIBOOT_HEADER
      #define MULTIBOOT_HEADER 1
      
