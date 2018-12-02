@@ -49,7 +49,7 @@ void *
 vm_alloc(usize size, uint8 sector_id)
 {
     vm_sector *sector = &(kmem->sectors[sector_id]);
-    if (size <= sector->largest_free->free)
+    if (size < sector->largest_free->free)
     {
         for (uint32 i = 0; i < BKTSZ; i++)
         {
