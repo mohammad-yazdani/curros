@@ -27,8 +27,8 @@ C_FLAGS =   -x c \
 			-ffreestanding \
 			-fno-pic \
 			-fno-stack-protector \
-			-Wno-error=int-to-pointer-cast \
-			-Wno-error=zero-length-array \
+			-Wno-int-to-pointer-cast \
+			-Wno-zero-length-array \
 			$(C_FLAGS_ARCH_X86_64) \
 			-I$(INC)/ \
 			$(C_FLAGS_$(MOD))
@@ -74,16 +74,24 @@ DMP := $(OUT)/kernel.dmp
 C_SRC := atree.c \
 	    kmain.c \
 	    llist.c \
-		salloc.c \
-		pmm.c \
-		vmm.c \
+		intr.c \
+		clib.c \
+		print.c \
 		multiboot2.c \
-		elf64.c
+		pmm.c \
+		elf64.c \
+		vmm.c \
+		spin_lock.c \
+		thread.c \
+		proc.c \
+		paging.c
 
 # ===============================
 # Add additional ASM source files here
 # ===============================
-ASM_SRC := boot.asm
+ASM_SRC := boot.asm \
+		   cpu.asm \
+		   intr.asm
 
 
 # ===============================

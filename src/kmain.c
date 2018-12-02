@@ -1,5 +1,10 @@
 #include "multiboot2.h"
-#include "cdef.h"
+#include "intr.h"
+#include "print.h"
+#include "clib.h"
+#include "cpu.h"
+#include "thread.h"
+#include "proc.h"
 #include "pmm.h"
 #include "vmm.h"
 #include "elf64.h"
@@ -24,6 +29,9 @@ void kmain(mbentry * mb)
 	init_vm();
 	vmm_test();
 
+	print_init();
+	intr_init();
+
 	// Here is the first page table
 	while (1) {}
 }
@@ -33,19 +41,19 @@ void kmain(mbentry * mb)
 void
 pmm_test()
 {
-	int32 * llmem1 = pmalloc(4096);
-	*llmem1 = 14;
-	int32 * llmem2 = pmalloc(4096);
-	*llmem2 = *llmem1 + 12;
-	(void)llmem2;
-	pfree((paddr) llmem2);
-	pfree((paddr) llmem1);
+    int32 *llmem1 = pmalloc(4096);
+    *llmem1 = 14;
+    int32 *llmem2 = pmalloc(4096);
+    *llmem2 = *llmem1 + 12;
+    (void) llmem2;
+    pfree((paddr) llmem2);
+    pfree((paddr) llmem1);
 }
 
 typedef struct dummys
 {
-	uint16 test0;
-	int64 test1;
+    uint16 test0;
+    int64 test1;
 } ds;
 
 void
