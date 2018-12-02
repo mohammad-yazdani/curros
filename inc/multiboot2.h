@@ -89,6 +89,10 @@
      
      #ifndef ASM_FILE
      
+     /* CurrOS */
+     #include "cdef.h"
+     /* CurrOS */
+
      typedef unsigned char           multiboot_uint8_t;
      typedef unsigned short          multiboot_uint16_t;
      typedef unsigned int            multiboot_uint32_t;
@@ -411,8 +415,19 @@
        multiboot_uint32_t size;
        multiboot_uint32_t load_base_addr;
      };
-     
+    
+     /* CurrOS */
+     typedef struct multiboot2_entry
+     {
+       uint32 total_size;
+       uint32 reserved;
+     } mbentry;
+       
+     typedef struct multiboot_header mheader;
+     typedef struct multiboot_header_tag htag;
+     void parse_mb2(mbentry * mb, void ** module, char ** ld_name);
+     /* CurrOS */
+
      #endif /*  ! ASM_FILE */
      
      #endif /*  ! MULTIBOOT_HEADER */
-

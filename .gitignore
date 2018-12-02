@@ -1,5 +1,6 @@
-.idea/
 out/
-CMakeLists.txt
-cmake-build-debug/
-.vscode/
+*.sh
+storage
+utils/
+.DS_Store
+

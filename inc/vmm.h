@@ -5,6 +5,7 @@
 #include "memory_layout.h"
 #include "llist.h"
 #include "pmm.h"
+#include "spin_lock.h"
 
 typedef uintptr vaddr;
 typedef struct llist vmll;
@@ -51,9 +52,10 @@ typedef struct page_table_entries
     vm_object *pages;
 
     vmll *global_alloc;
+    usize free_frames;
 } vmem;
 
-void init_vm();
+void init_vm(struct spin_lock * vmlk);
 
 void vm_issue_unit(uint64 id, usize size);
 

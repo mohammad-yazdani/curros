@@ -1,11 +1,10 @@
-#include <print.h>
-#include "pmm.h"
 #include "memory_layout.h"
-
+#include "pmm.h"
 
 uint8 mem_state = 0;
 memlist *freelist = 0x0;
 uint64 pmem_head = 0;
+struct spin_lock * pm_global_lock;
 
 uint64 KHEAP_LO = 0;
 uint64 KHEAP_HI = 0;
@@ -34,23 +33,28 @@ get_mem_phase()
 }
 
 void
-pmm_init()
+pmm_init(struct spin_lock * pmlk)
 {
+    pm_global_lock = pmlk;
+    spin_init(pm_global_lock);
+
     if (mem_state)
     {
         KHEAP_HI = MEM_HI;
         KHEAP_LO = MEM_HI + HISZ;
-        // TODO : Freelist allocation hacks
 
-        freelist = pmalloc(4096);
-        lb_llist_init(freelist);
+		// Freelist allocation hacks
+		freelist = pmalloc(4096);
 
-        memnode *freelist_node = (memnode *) (freelist + (sizeof(*freelist)));
-        allocu *freelist_unit = (allocu *) (freelist_node + (sizeof(*freelist_node)));
-        freelist_unit->size = 1;
-        freelist_unit->status = 1;
-        // TODO : First allocation unit points to PMM data structure.
-        freelist_unit->head = (paddr) freelist;
+        spin_lock(pm_global_lock);
+		lb_llist_init(freelist);
+
+		memnode * freelist_node = (memnode *) (freelist + (sizeof(*freelist)));
+		allocu * freelist_unit = (allocu *) (freelist_node + (sizeof(*freelist_node)));
+		freelist_unit->size = 1;
+		freelist_unit->status = 1;
+		// First allocation unit points to PMM data structure.
+		freelist_unit->head = (paddr) freelist;
 
         freelist_node->data = freelist_unit;
 
@@ -59,6 +63,8 @@ pmm_init()
         // TODO : IF all is good, now we must have a llist of memory
         mem_state = 2;
     }
+
+    spin_unlock(pm_global_lock);
 }
 
 paddr
@@ -105,8 +111,7 @@ alloc_ppage(uint32 n)
 
     if (mem_state == 1)
     {
-        // TODO : This is init phase allocator. Branch off logic
-        uint64 offset = (pmem_head + 1) * (PAGE_SIZE * n);
+        uint64 offset = (pmem_head + n) * PAGE_SIZE;
         allocated = KHEAP_LO - offset;
         if (allocated == KHEAP_HI)
         { return 0; }
@@ -132,6 +137,7 @@ alloc_ppage(uint32 n)
 void
 pfree(paddr p)
 {
+    spin_lock(pm_global_lock);
     memnode *curr_node = freelist->head;
     while (curr_node)
     {
@@ -139,19 +145,26 @@ pfree(paddr p)
         if (toalloc->head == p && toalloc->status == 1 && toalloc->size > 0)
         {
             toalloc->status = 0;
+            spin_unlock(pm_global_lock);
             return;
         }
 
         curr_node = curr_node->next;
     }
+    spin_unlock(pm_global_lock);
 }
 
 void *
 pmalloc(uint32 size)
 {
+    spin_lock(pm_global_lock);
+    
     uint32 left_over = size % PAGE_SIZE;
     uint32 num_pages = (size / PAGE_SIZE) + (left_over > 0);
     paddr new_alloc_paddr = alloc_ppage(num_pages);
+
+    spin_unlock(pm_global_lock);
+
     return (void *) new_alloc_paddr;
 }
 

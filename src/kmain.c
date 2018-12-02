@@ -8,110 +8,58 @@
 #include "pmm.h"
 #include "error.h"
 #include "vmm.h"
+#include "elf64.h"
 
-typedef struct multiboot_entry
-{
-    uint32 total_size;
-    uint32 reserved;
-} mbentry;
-typedef struct multiboot_tag mtag;
+typedef struct multiboot_tag_module mod_tag;
 
-void
-proccess_mmap(struct multiboot_tag_mmap *mmap)
+void ktest1(void* arg);
+void ktest2(void* arg);
+void kproc(void* arg);
+void proc_test(int32 * status);
+void exec_test(void * entry, int32 * status);
+void pmm_test();
+void vmm_test();
+
+void kmain(mbentry * mb)
 {
-    struct multiboot_mmap_entry entry;
-    uint16 num_entries = (mmap->size - sizeof(*mmap)) / mmap->entry_size;
-    for (uint16 i = 0; i < num_entries; i++)
-    {
-        entry = mmap->entries[i];
-        kprintf("ADDR: 0x%x   LEN: 0x%x  TYPE: %x\n", (uint64)entry.addr, (uint64)entry.len, (uint64)entry.type);
-        if (entry.type == 1)
-        {
-            if (entry.addr)
-            {
-                kprintf("Set high: 0x%x\n", entry.addr);
-                set_mmap_high(entry.addr, entry.len);
-            }
-            else
-            {
-                kprintf("Set low: 0x%x\n", entry.addr);
-                set_mmap_low(entry.addr, entry.len);
-            }
-        }
-    }
+    int32 status;
+
+    print_init();
+    intr_init();
+
+    status = intr_init();
+    KASSERT(status == ESUCCESS);
+
+	char * ld_name = 0x0;
+	mod_tag * module = 0x0;
+	parse_mb2(mb, (void **)(&module), &ld_name);
+
+    kprintf("%s\n", ld_name);
+    kprintf("Module loaded starting at %X and ending at %X.\n", module->mod_start, module->mod_end);
+
+	void * exec_entry = elf_load_file((void *) module->mod_start);
+	kprintf("Executable load from module file. Entry at: %X\n", exec_entry);
+
+    struct spin_lock pmlk = {0};
+    struct spin_lock vmlk = {0};
+
+	pmm_init(&pmlk);
+	pmm_test();
+
+	init_vm(&vmlk);
+	vmm_test();
+
+    proc_test(&status);
+    //exec_test(exec_entry, &status);
+
+	// TODO : Here is the first page table
+
+    // wait for timer interrupt to fire and schedule the first thread
+	while (1) {}
 }
 
-uint32
-proccess_tag(mtag *tag)
-{
-    struct multiboot_tag_mmap *mmap_tag = 0;
-    struct multiboot_tag_load_base_addr *base_tag = 0;
-
-    switch (tag->type)
-    {
-        case 6:
-            mmap_tag = (struct multiboot_tag_mmap *) tag;
-            proccess_mmap(mmap_tag);
-            break;
-        case 21:
-            base_tag = (struct multiboot_tag_load_base_addr *) tag;
-            (void) base_tag;
-            break;
-        case 15:
-            // acpi table
-
-        default:
-            break;
-    }
-    return tag->size;
-}
-
-void
-parse_multiboot(mbentry *mb)
-{
-    uint32 next_entry;
-    next_entry = ((uint32) mb) + 8;
-    mtag *tag = (mtag *) next_entry;
-
-    while (1)
-    {
-        uint32 size = proccess_tag(tag);
-        if (!size)
-        { break; }
-        tag += size;
-    }
-}
 
 /* TESTS */
-void
-pmm_test()
-{
-    int32 *llmem1 = pmalloc(4096);
-    *llmem1 = 14;
-    int32 *llmem2 = pmalloc(4096);
-    *llmem2 = *llmem1 + 12;
-    (void) llmem2;
-    pfree((paddr) llmem2);
-    pfree((paddr) llmem1);
-}
-
-typedef struct dummys
-{
-    uint16 test0;
-    int64 test1;
-} ds;
-
-void
-vmm_test()
-{
-    uint64 *test_int = kalloc(sizeof(uint64));
-    ds *dummy = kalloc(sizeof(ds));
-    dummy->test0 = 34;
-    dummy->test1 = 12234322;
-
-    kfree(dummy);
-    kfree(test_int);
-}
 
 void ktest1(void* arg)
 {
@@ -133,7 +81,6 @@ void ktest2(void* arg)
     }
 }
 
-
 void kproc(void* arg)
 {
     UNREFERENCED(arg);
@@ -153,37 +100,56 @@ void kproc(void* arg)
     }
 }
 
-void kmain(void* mb)
+void
+proc_test(int32 * status)
 {
-    int32 status;
+    uint32 id;
+    *status = proc_create(kproc, &id);
+    KASSERT((*status) == ESUCCESS);
+    kprintf("Process creation successful.\n");
 
-    print_init();
+    // unmask all interrupts
+    WRITE_IRQ(0x0);
+}
 
-    status = intr_init();
-    KASSERT(status == ESUCCESS);
+void
+exec_test(void * entry, int32 * status)
+{
+    uint32 id;
+    *status = proc_create((void (*)(void *)) entry, &id);
+    KASSERT((*status) == ESUCCESS);
+    kprintf("Program execution successful.\n");
 
-    parse_multiboot(mb);
+    // unmask all interrupts
+    WRITE_IRQ(0x0);
+}
 
-    pmm_init();
-    pmm_test();
+void
+pmm_test()
+{
+    int32 *llmem1 = pmalloc(4096);
+    *llmem1 = 14;
+    int32 *llmem2 = pmalloc(4096);
+    *llmem2 = *llmem1 + 12;
+    (void) llmem2;
+    pfree((paddr) llmem2);
+    pfree((paddr) llmem1);
+}
 
-    init_vm();
-    //vmm_test();
+typedef struct dummys
+{
+    uint16 test0;
+    int64 test1;
+} ds;
 
-
-    for(int i = 0; i < 10; i++)
-    {
-        void* a = kalloc(48);
-
-        kprintf("0x%x\n", (uint64)a);
-    }
-
-    while(1)
-    {
-        //
-    }
-//    proc_init();
-//    thread_init();
+void
+vmm_test()
+{
+	uint64 * test_int = kalloc(sizeof(uint64));
+	ds * dummy = kalloc(sizeof(ds));
+	dummy->test0 = 34;
+	dummy->test1 = 12234322;
+	*test_int = 345;
 
     for(int i = 0; i < 10; i++)
     {
@@ -191,15 +157,9 @@ void kmain(void* mb)
         kprintf("0x%x\n", a);
     }
 
-    uint32 id;
-    status = proc_create(kproc, &id);
-    KASSERT(status == ESUCCESS);
+	kfree(dummy);
+	kfree(test_int);
 
-    // unmask all interrupts
-    WRITE_IRQ(0x0);
-
-    // wait for timer interrupt to fire and schedule the first thread
-    while(1)
-    {
-    }
+    kprintf("VMM TEST OK\n");
 }
+

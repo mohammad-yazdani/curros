@@ -64,6 +64,7 @@ LD_SCRIPT := linker.ld
 GRUB_CFG := grub.cfg
 
 TGT := $(OUT)/kernel.elf
+FILE := storage
 ISO := $(OUT)/curros.iso
 DMP := $(OUT)/kernel.dmp
 
@@ -75,8 +76,9 @@ C_SRC := kmain.c \
 		intr.c \
 		clib.c \
 		print.c \
+		multiboot2.c \
 		pmm.c \
-		elf.c \
+		elf64.c \
 		vmm.c \
 		spin_lock.c \
 		thread.c \
@@ -116,6 +118,7 @@ $(ISO): $(TGT) $(GRUB_CFG)
 	mkdir -p $(OUT)/temp/boot/grub
 	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
 	cp $(TGT) $(OUT)/temp/
+	cp $(FILE) $(OUT)/temp/
 	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
 
 .PHONY: mkdir
@@ -135,4 +138,5 @@ debug:
 
 .PHONY: gdb
 gdb: 
-	qemu-system-x86_64 -s -boot d -cdrom $(ISO)
+	qemu-system-x86_64 -s -m 128 -boot d -cdrom $(ISO) 
+
