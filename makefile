@@ -139,5 +139,5 @@ debug:
 
 .PHONY: gdb
 gdb: 
-	qemu-system-x86_64 -s -boot d -cdrom $(ISO) 
+	qemu-system-x86_64 -s -m 128 -boot d -cdrom $(ISO) 
 

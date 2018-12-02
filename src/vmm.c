@@ -225,9 +225,9 @@ kalloc(usize size)
         return NULL;
     }
 
-    void *ret = vm_alloc(size, sector_id);
+    void *ret = (void *) R_PADDR((paddr) vm_alloc(size, sector_id));
 
-    /* Hack */
+    /* Hack
     bool success = FALSE;
     if (ret != NULL)
     {
@@ -244,7 +244,7 @@ kalloc(usize size)
     {
         kfree(ret);
         ret = NULL;
-    }
+    }*/
 
     return ret;
 }

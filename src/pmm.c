@@ -103,7 +103,7 @@ alloc_ppage(uint32 n)
 
     if (mem_state == 1)
     {
-        uint64 offset = (pmem_head + 1) * (PAGE_SIZE * n);
+        uint64 offset = (pmem_head + n) * PAGE_SIZE;
         allocated = KHEAP_LO - offset;
         if (allocated == KHEAP_HI)
         { return 0; }
