@@ -67,10 +67,10 @@ vm_alloc(usize size, uint8 sector_id)
             if (size < obj->free) {
                 // Allocate
                 vaddr offset = 0;
-                if (obj->allocs.tail) {
-                    vm_node *tail_node = obj->allocs.tail;
-                    vm_atom *tail_atom = tail_node->data;
-                    offset += tail_atom->offset + tail_atom->size;
+                if (obj->allocs.head) {
+                    vm_node *head_node = obj->allocs.head;
+                    vm_atom *head_atom = head_node->data;
+                    offset += head_atom->offset + head_atom->size;
                 }
 
                 vm_node *node = get_alloc_node();
@@ -80,7 +80,7 @@ vm_alloc(usize size, uint8 sector_id)
                 atom->page_ptr = obj;
                 atom->offset = offset;
 
-                lb_llist_push_back(&(obj->allocs), node);
+                lb_llist_push_front(&(obj->allocs), node);
 
                 obj->free -= size;
                 if (obj->status == 2) {
@@ -364,35 +364,37 @@ kfree(void *ptr)
 
     usize offset = num_ptr - page->address;
     
-    vm_node * head = page->allocs.head;
+    vm_node * tail = page->allocs.tail;
 
-    while (head) {
-        vm_atom * atom = head->data;
+    while (tail) {
+        vm_atom * atom = tail->data;
         if (atom->offset == offset && atom->page_ptr == page) {
             page->free += atom->size;
             
-            vm_node * prev = head->prev;
+            /*vm_node * prev = head->prev;
             if (!prev) {
                 page->allocs.head = head->next;
             } else {
                 prev->next = head->next;
-            }
+            }*/
             
-            lb_llist_remove_by_ref(&(page->allocs), head);
+            lb_llist_remove_by_ref(&(page->allocs), tail);
 
             if (page->allocs.size == 0) {
                 page->allocs.head = 0x0;
                 page->allocs.tail = 0x0;
             }
 
+            spin_unlock(vm_global_lock);
             if (kmem->global_alloc->size >= 320) {
                 kfree(atom);
-                kfree(head);
+                kfree(tail);
             }
 
-            break;
+            return;
         }
-        head = head->next;
+        if (tail == tail->next) break;
+        tail = tail->next;
     }
 
     spin_unlock(vm_global_lock);

@@ -37,8 +37,6 @@ pmm_init(struct spin_lock * pmlk)
 {
     pm_global_lock = pmlk;
     spin_init(pm_global_lock);
-    
-    spin_lock(pm_global_lock);
 
     if (mem_state)
     {
@@ -47,6 +45,8 @@ pmm_init(struct spin_lock * pmlk)
 
 		// Freelist allocation hacks
 		freelist = pmalloc(4096);
+
+        spin_lock(pm_global_lock);
 		lb_llist_init(freelist);
 
 		memnode * freelist_node = (memnode *) (freelist + (sizeof(*freelist)));
@@ -145,6 +145,7 @@ pfree(paddr p)
         if (toalloc->head == p && toalloc->status == 1 && toalloc->size > 0)
         {
             toalloc->status = 0;
+            spin_unlock(pm_global_lock);
             return;
         }
 

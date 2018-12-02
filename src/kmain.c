@@ -16,6 +16,7 @@ void ktest1(void* arg);
 void ktest2(void* arg);
 void kproc(void* arg);
 void proc_test(int32 * status);
+void exec_test(void * entry, int32 * status);
 void pmm_test();
 void vmm_test();
 
@@ -46,9 +47,10 @@ void kmain(mbentry * mb)
 	pmm_test();
 
 	init_vm(&vmlk);
-	//vmm_test();
+	vmm_test();
 
     proc_test(&status);
+    //exec_test(exec_entry, &status);
 
 	// TODO : Here is the first page table
 
@@ -104,6 +106,19 @@ proc_test(int32 * status)
     uint32 id;
     *status = proc_create(kproc, &id);
     KASSERT((*status) == ESUCCESS);
+    kprintf("Process creation successful.\n");
+
+    // unmask all interrupts
+    WRITE_IRQ(0x0);
+}
+
+void
+exec_test(void * entry, int32 * status)
+{
+    uint32 id;
+    *status = proc_create((void (*)(void *)) entry, &id);
+    KASSERT((*status) == ESUCCESS);
+    kprintf("Program execution successful.\n");
 
     // unmask all interrupts
     WRITE_IRQ(0x0);
@@ -140,10 +155,11 @@ vmm_test()
     {
         void* a = kalloc(48);
         kprintf("0x%x\n", a);
-        kprintf("0x%x\n", (uint64)a);
     }
 
 	kfree(dummy);
 	kfree(test_int);
+
+    kprintf("VMM TEST OK\n");
 }
 
