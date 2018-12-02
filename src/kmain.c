@@ -39,10 +39,13 @@ void kmain(mbentry * mb)
 	void * exec_entry = elf_load_file((void *) module->mod_start);
 	kprintf("Executable load from module file. Entry at: %X\n", exec_entry);
 
-	pmm_init();
+    struct spin_lock pmlk = {0};
+    struct spin_lock vmlk = {0};
+
+	pmm_init(&pmlk);
 	pmm_test();
 
-	init_vm();
+	init_vm(&vmlk);
 	//vmm_test();
 
     proc_test(&status);
