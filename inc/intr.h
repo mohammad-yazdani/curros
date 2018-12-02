@@ -13,6 +13,7 @@
 #define GDT_SIZE ((NUM_GDT_DESC) * (GDT_DESC_SIZE))
 #define IDT_SIZE ((NUM_IDT_DESC) * (IDT_DESC_SIZE))
 
+#define NUM_CORES (2)
 #define GDT_K_CODE (1)
 #define GDT_NULL (0)
 #define GDT_K_DATA (2)
@@ -81,16 +82,25 @@ struct PACKED intr_frame
     uint64 ss;
 };
 
+#define INTR_VEC_TIMER    (50)
+#define INTR_VEC_SPURIOUS (255)
+#define INTR_VEC_SYSCALL  (51)
+
 
 // returns the new exception frame pointer
 // interrupt handlers should EOI
-typedef void (*intr_handler)(uint32 vec, struct intr_frame *frame);
+typedef void* (*intr_handler)(struct intr_frame *frame);
 
 uint32 get_core();
 
+uint32 get_bsp();
+
 int32 intr_init();
 
-void ASM_F intr_dispatcher(uint32 vec, struct intr_frame *frame);
+void* ASM_F intr_dispatcher(uint32 vec, struct intr_frame *frame);
 
 void set_intr_handler(uint32 vec, intr_handler handler);
 
+void send_ipi(uint32 coreid, uint32 vec);
+
+void stop_cpu();

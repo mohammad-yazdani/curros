@@ -6,6 +6,7 @@
 #include "thread.h"
 #include "proc.h"
 #include "pmm.h"
+#include "error.h"
 #include "vmm.h"
 
 typedef struct multiboot_entry
@@ -23,14 +24,17 @@ proccess_mmap(struct multiboot_tag_mmap *mmap)
     for (uint16 i = 0; i < num_entries; i++)
     {
         entry = mmap->entries[i];
+        kprintf("ADDR: 0x%x   LEN: 0x%x  TYPE: %x\n", (uint64)entry.addr, (uint64)entry.len, (uint64)entry.type);
         if (entry.type == 1)
         {
             if (entry.addr)
             {
+                kprintf("Set high: 0x%x\n", entry.addr);
                 set_mmap_high(entry.addr, entry.len);
             }
             else
             {
+                kprintf("Set low: 0x%x\n", entry.addr);
                 set_mmap_low(entry.addr, entry.len);
             }
         }
@@ -106,10 +110,54 @@ vmm_test()
     kfree(test_int);
 }
 
+void ktest1(void* arg)
+{
+    UNREFERENCED(arg);
+    while(1)
+    {
+        poor_sleep(1000);
+        kprintf("test1...\n");
+    }
+}
+
+void ktest2(void* arg)
+{
+    UNREFERENCED(arg);
+    while(1)
+    {
+        poor_sleep(1000);
+        kprintf("test2...\n");
+    }
+}
+
+
+void kproc(void* arg)
+{
+    UNREFERENCED(arg);
+
+    uint32 id;
+    cli();
+    thread_create(get_cur_thread()->proc, ktest1, NULL, &id);
+    kprintf("Create thread1 %d\n", id);
+    list_threads();
+    thread_create(get_cur_thread()->proc, ktest2, NULL, &id);
+    kprintf("Create thread2 %d\n", id);
+    list_threads();
+    while(1)
+    {
+        poor_sleep(1000);
+        kprintf("Idle thread...\n");
+    }
+}
+
 void kmain(void* mb)
 {
+    int32 status;
+
     print_init();
-    intr_init();
+
+    status = intr_init();
+    KASSERT(status == ESUCCESS);
 
     parse_multiboot(mb);
 
@@ -117,10 +165,38 @@ void kmain(void* mb)
     pmm_test();
 
     init_vm();
-    vmm_test();
+    //vmm_test();
+
+
+    for(int i = 0; i < 10; i++)
+    {
+        void* a = kalloc(48);
+
+        kprintf("0x%x\n", (uint64)a);
+    }
 
     while(1)
     {
+        //
+    }
+//    proc_init();
+//    thread_init();
 
+    for(int i = 0; i < 10; i++)
+    {
+        void* a = kalloc(48);
+        kprintf("0x%x\n", a);
+    }
+
+    uint32 id;
+    status = proc_create(kproc, &id);
+    KASSERT(status == ESUCCESS);
+
+    // unmask all interrupts
+    WRITE_IRQ(0x0);
+
+    // wait for timer interrupt to fire and schedule the first thread
+    while(1)
+    {
     }
 }

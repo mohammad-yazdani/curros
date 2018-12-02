@@ -10,4 +10,4 @@
 #define PAGE_SIZE 				0x1000
 
 #define R_PADDR(paddr) (void*)((paddr) + K_PMAP_VADDR)
-#define IS_KERN_SPACE(vaddr) (((uintptr)vaddr) < K_START)
+#define IS_KERN_SPACE(vaddr) (((uintptr)vaddr) >= K_START)

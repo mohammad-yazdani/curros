@@ -1,9 +1,15 @@
 #pragma once
 
 #include "cdef.h"
+#include "memory_layout.h"
 
-#define KERNEL_PAGE_SIZE (4096)
+#define PML4_ENTRY(vaddr) ((vaddr >> 39) & 0x1FF)
+#define PDPT_ENTRY(vaddr) ((vaddr >> 30) & 0x1FF)
+#define PD_ENTRY(vaddr) ((vaddr >> 21) & 0x1FF)
+#define PT_ENTRY(vaddr) ((vaddr >> 12) & 0x1FF)
 
-uintptr get_paddr(uintptr vaddr);
+#define KERNEL_PAGE_SIZE (PAGE_SIZE)
 
-int32 map_vmem(uintptr virt_addr, uintptr phys_addr);
+uintptr get_paddr(uint64 cr3, uintptr vaddr);
+
+int32 map_vmem(uint64 cr3, uintptr virt_addr, uintptr phys_addr);

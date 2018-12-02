@@ -1,3 +1,4 @@
+#include <print.h>
 #include "pmm.h"
 #include "memory_layout.h"
 
@@ -39,7 +40,6 @@ pmm_init()
     {
         KHEAP_HI = MEM_HI;
         KHEAP_LO = MEM_HI + HISZ;
-
         // TODO : Freelist allocation hacks
 
         freelist = pmalloc(4096);

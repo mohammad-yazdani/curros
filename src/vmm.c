@@ -4,6 +4,8 @@
 #include "paging.h"
 #include <memory_layout.h>
 #include <error.h>
+#include <cpu.h>
+#include "print.h"
 
 #define SYS_TOTAL (K_DYN_END - K_DYNAMIC) // heap start - end
 #define TOTAL_PAGE_NUM (SYS_TOTAL / PAGE_SIZE)
@@ -47,7 +49,7 @@ void *
 vm_alloc(usize size, uint8 sector_id)
 {
     vm_sector *sector = &(kmem->sectors[sector_id]);
-    if (size < sector->largest_free->free)
+    if (size <= sector->largest_free->free)
     {
         for (uint32 i = 0; i < BKTSZ; i++)
         {
@@ -134,6 +136,7 @@ init_vm()
     uint64 counter = 0;
     while (curr_address < K_DYN_END)
     {
+//        kprintf("kmem: 0x%x, kmem->pages: 0x%x counter: %d\n", kmem, kmem->pages, counter);
         vm_object *obj = &(kmem->pages[counter]);
         obj->address = curr_address;
         lb_llist_init(&(obj->allocs));
@@ -214,22 +217,26 @@ kalloc(usize size)
     void *ret = vm_alloc(size, sector_id);
 
     /* Hack */
-    bool success = FALSE;
+    int32 status = ESUCCESS;
     if (ret != NULL)
     {
         // check if the target page is already mapped
         // ret val does not cross page boundries
-        if (get_paddr((uintptr) ret) == (uintptr) NULL)
+        if (get_paddr(read_cr3(), (uintptr) ret) == (uintptr) NULL)
         {
             uintptr frame = (uintptr) pmalloc(PAGE_SIZE);
-            success = (frame != (uintptr) NULL) && (map_vmem((uintptr) ret, frame) != ESUCCESS);
+            status = (frame != (uintptr) NULL) && (map_vmem(read_cr3(), (uintptr) ret, frame) != ESUCCESS);
         }
     }
 
-    if (!success)
+    if (status != ESUCCESS)
     {
         kfree(ret);
         ret = NULL;
+    }
+    else
+    {
+        flush_tlb();
     }
 
     return ret;

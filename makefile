@@ -70,8 +70,7 @@ DMP := $(OUT)/kernel.dmp
 # ===============================
 # Add additional c source files here
 # ===============================
-C_SRC := atree.c \
-	    kmain.c \
+C_SRC := kmain.c \
 	    llist.c \
 		intr.c \
 		clib.c \
