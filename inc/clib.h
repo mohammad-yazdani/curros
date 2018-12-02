@@ -27,6 +27,10 @@ mem_cpy(void *src, void *dst, uint64 size);
 void
 mem_mv(void *src, void *dst, uint64 size);
 
+#define KASSERT(expr) kassert_ex(#expr, __FILE__, __LINE__, expr)
+
+void
+kassert_ex(const char *expr_str, const char *file, int32 line, int32 expr);
 
 void
 mem_set(void *src, uint8 val, uint64 size);

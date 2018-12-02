@@ -27,6 +27,8 @@ void ASM_F sti();
 
 void ASM_F cli();
 
+void ASM_F hlt();
+
 uint64 ASM_F read_cr8();
 
 void ASM_F write_cr8(uint64 val);
@@ -34,5 +36,7 @@ void ASM_F write_cr8(uint64 val);
 uint64 ASM_F read_cr3();
 
 void ASM_F write_cr3(uint64 val);
+
+void ASM_F flush_tlb();
 
 #define BOCHS_BREAK __asm__("xchg %bx,%bx");

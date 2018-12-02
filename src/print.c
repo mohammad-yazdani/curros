@@ -1,15 +1,18 @@
 #include "print.h"
 #include "clib.h"
 #include "memory_layout.h"
+#include "spin_lock.h"
 
 #define FBUF (uintptr)R_PADDR(0xb8000)
 #define GET_ROW(pos) ((pos) / 80)
 #define GET_POS(row, col) ((row) * 80 + (col))
 
+static struct spin_lock lock;
 static uint64 text_pos;
 
 void print_init()
 {
+    spin_init(&lock);
     text_pos = 0;
     clear_screen();
 }
@@ -136,8 +139,11 @@ print_hex(uint64 number, uint64 capital)
 void
 clear_screen(void)
 {
+    uint64 irq;
+    irq = spin_lock_irq_save(&lock);
     text_pos = 0; // reset text_pos
     mem_set((void *) FBUF, 0, 25 * 80 * 2);
+    spin_unlock_irq_restore(&lock, irq);
 }
 
 static void
@@ -198,6 +204,9 @@ kprintf(char const *format, ...)
 {
     va_list args;
     va_start(args, format);
+    uint64 irq;
+    irq = spin_lock_irq_save(&lock);
     kvprintf(format, args);
+    spin_unlock_irq_restore(&lock, irq);
     va_end(args);
 }

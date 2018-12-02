@@ -20,6 +20,17 @@ global cli
 global sti
 global read_cr3
 global write_cr3
+global flush_tlb
+global hlt
+
+hlt:
+hlt
+ret
+
+flush_tlb:
+mov rax, cr3
+mov cr3, rax
+ret
 
 read_cr3:
 mov rax, cr3

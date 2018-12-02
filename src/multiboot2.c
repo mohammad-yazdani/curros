@@ -1,6 +1,7 @@
 #include <multiboot2.h>
 #include <pmm.h>
 #include <cdef.h>
+#include <print.h>
 
 
 // Putting multiboot device info here
@@ -29,14 +30,22 @@ void
 process_mmap(struct multiboot_tag_mmap * mmap)
 {
 	struct multiboot_mmap_entry entry;
+
 	uint16 num_entries = (mmap->size - sizeof(*mmap)) / mmap->entry_size;
-	for (uint16 i = 0; i < num_entries; i++) {
-		entry = mmap->entries[i];
-		if (entry.type == 1) {
-			if (entry.addr) set_mmap_high(entry.addr, entry.len);
-			else set_mmap_low(entry.addr, entry.len);
-		}
-	}
+    for (uint16 i = 0; i < num_entries; i++) {
+        entry = mmap->entries[i];
+        kprintf("ADDR: 0x%x   LEN: 0x%x  TYPE: %x\n", (uint64)entry.addr, (uint64)entry.len, (uint64)entry.type);
+        if (entry.type == 1) {
+            if (entry.addr) {
+                kprintf("Set high: 0x%x\n", entry.addr);
+                set_mmap_high(entry.addr, entry.len);
+            }
+            else {
+                kprintf("Set low: 0x%x\n", entry.addr);
+                set_mmap_low(entry.addr, entry.len);
+            }
+        }
+    }
 }
 
 

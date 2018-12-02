@@ -344,7 +344,21 @@ decl_intr_stub 46
 decl_intr_stub 47
 decl_intr_stub 48
 decl_intr_stub 49
-decl_intr_stub 50
+
+intr_stub_50:
+; push dummy error code to have consistent frame
+push qword 0
+PUSH_REGS
+mov rdi, 50
+mov rsi, rsp
+call intr_dispatcher
+                      ; now rax hows the next thread's rsp0
+mov rsp, rax          ; switch stack
+POP_REGS              ; restore registers
+add rsp, 8            ; skip error code
+xchg bx,bx
+iretq
+
 decl_intr_stub 51
 decl_intr_stub 52
 decl_intr_stub 53

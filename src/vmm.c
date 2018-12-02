@@ -4,6 +4,8 @@
 #include "paging.h"
 #include <memory_layout.h>
 #include <error.h>
+#include <cpu.h>
+#include "print.h"
 
 #define SYS_TOTAL (K_DYN_END - K_DYNAMIC) // heap start - end
 #define TOTAL_PAGE_NUM (SYS_TOTAL / PAGE_SIZE)
@@ -37,8 +39,7 @@ get_alloc_node()
     vm_node *alloc = NULL;
     vm_atom *atom = NULL;
 
-    if (kmem->global_alloc->size < 320)
-    { // TODO : Temporary hard code
+    if (kmem->global_alloc->size < 320) { // TODO : Temporary hard code
         vaddr tail = (vaddr) kmem->global_alloc->tail;
         if (!tail)
         { tail = (vaddr) kmem->global_alloc; }
@@ -46,9 +47,7 @@ get_alloc_node()
         atom = (void *) ((vaddr) alloc + sizeof(vm_node));
         alloc->data = atom;
         lb_llist_push_back(kmem->global_alloc, alloc);
-    }
-    else
-    {
+    } else {
         alloc = kalloc(sizeof(vm_node));
         atom = kalloc(sizeof(vm_atom));
         alloc->data = atom;
@@ -61,17 +60,13 @@ void *
 vm_alloc(usize size, uint8 sector_id)
 {
     vm_sector *sector = &(kmem->sectors[sector_id]);
-    if (size < sector->largest_free->free)
-    {
-        for (uint32 i = 0; i < BKTSZ; i++)
-        {
+    if (size < sector->largest_free->free) {
+        for (uint32 i = 0; i < BKTSZ; i++) {
             vm_object *obj = sector->actbck[i];
-            if (size < obj->free)
-            {
+            if (size < obj->free) {
                 // Allocate
                 vaddr offset = 0;
-                if (obj->allocs.tail)
-                {
+                if (obj->allocs.tail) {
                     vm_node *tail_node = obj->allocs.tail;
                     vm_atom *tail_atom = tail_node->data;
                     offset += tail_atom->offset + tail_atom->size;
@@ -87,27 +82,21 @@ vm_alloc(usize size, uint8 sector_id)
                 lb_llist_push_back(&(obj->allocs), node);
 
                 obj->free -= size;
-                if (!obj->status)
-                {
+                if (!obj->status) {
                     obj->status = 1;
 
-                    if (sector->dirty == 31)
-                    {
+                    if (sector->dirty == 31) {
                         sector->largest_free = sector->actbck[0];
-                        for (uint32 j = 1; j < 32; j++)
-                        {
-                            if (sector->actbck[j]->free > sector->largest_free->free)
-                            {
+                        for (uint32 j = 1; j < 32; j++) {
+                            if (sector->actbck[j]->free > sector->largest_free->free) {
                                 sector->largest_free = sector->actbck[j];
                             }
                         }
                     }
                     sector->dirty += 1;
                 }
-                if (sector->dirty == 32)
-                {
-                    if (sector->largest_free->free < obj->free)
-                    {
+                if (sector->dirty == 32) {
+                    if (sector->largest_free->free < obj->free) {
                         sector->largest_free = obj;
                     }
                 }
@@ -119,8 +108,7 @@ vm_alloc(usize size, uint8 sector_id)
         }
         return 0;
     }
-    else
-    {
+    else {
         // TODO : Swap active and reserve
         // TODO : Re-fill reserve
         return 0;
@@ -146,8 +134,7 @@ init_vm()
     vaddr curr_address = K_DYNAMIC;
 
     uint64 counter = 0;
-    while (curr_address < K_DYN_END)
-    {
+    while (curr_address < K_DYN_END) {
         vm_object *obj = &(kmem->pages[counter]);
         obj->address = curr_address;
         lb_llist_init(&(obj->allocs));
@@ -177,14 +164,12 @@ init_vm()
     sector2->end = TOTAL_PAGE_NUM;
     sector2->largest_free = 0x0;
 
-    for (uint8 secnum = 0; secnum < 3; secnum++)
-    {
+    for (uint8 secnum = 0; secnum < 3; secnum++) {
         vm_sector *sector = &(kmem->sectors[secnum]);
 
         sector->actbck = pmalloc(PAGE_SIZE);
         sector->resbck = pmalloc(PAGE_SIZE);
-        for (uint32 i = 0; i < BKTSZ; i++)
-        {
+        for (uint32 i = 0; i < BKTSZ; i++) {
             vm_object *obj_act = &(kmem->pages[sector->start + i]);
             vm_object *obj_res = &(kmem->pages[sector->start + i + BKTSZ]);
             sector->actbck[i] = obj_act;
@@ -207,44 +192,37 @@ void *
 kalloc(usize size)
 {
     uint8 sector_id;
-    if (size <= SECTOR0_BOUND)
-    {
+    if (size <= SECTOR0_BOUND){
         sector_id = 0;
-    }
-    else if (size <= SECTOR1_BOUND)
-    {
+    } else if (size <= SECTOR1_BOUND) {
         sector_id = 1;
-    }
-    else if (size <= PAGE_SIZE)
-    {
+    } else if (size <= PAGE_SIZE) {
         sector_id = 2;
-    }
-    else
-    {
+    } else {
         // TODO : Handle large alloc
         return NULL;
     }
 
-    void *ret = (void *) R_PADDR((paddr) vm_alloc(size, sector_id));
+    void *ret = vm_alloc(size, sector_id);
+    //void *ret = (void *) R_PADDR((paddr) vm_alloc(size, sector_id));
 
-    /* Hack
-    bool success = FALSE;
-    if (ret != NULL)
-    {
+    /* Hack */
+    int32 status = ESUCCESS;
+    if (ret != NULL) {
         // check if the target page is already mapped
         // ret val does not cross page boundries
-        if (get_paddr((uintptr) ret) == (uintptr) NULL)
-        {
+        if (get_paddr(read_cr3(), (uintptr) ret) == (uintptr) NULL) {
             uintptr frame = (uintptr) pmalloc(PAGE_SIZE);
-            success = (frame != (uintptr) NULL) && (map_vmem((uintptr) ret, frame) != ESUCCESS);
+            status = (frame != (uintptr) NULL) && (map_vmem(read_cr3(), (uintptr) ret, frame) != ESUCCESS);
         }
     }
 
-    if (!success)
-    {
+    if (status != ESUCCESS) {
         kfree(ret);
         ret = NULL;
-    }*/
+    } else {
+        flush_tlb();
+    }
 
     return ret;
 }

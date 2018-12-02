@@ -1,4 +1,6 @@
 #include "clib.h"
+#include "print.h"
+#include "intr.h"
 
 void
 mem_cpy(void *src, void *dst, uint64 size)
@@ -74,5 +76,14 @@ poor_sleep(uint32 dat)
 {
     for(uint32 i = 0; i < dat; i++)
     {
+    }
+}
+
+void kassert_ex(const char *expr_str, const char *file, int32 line, int32 expr)
+{
+    if (!expr)
+    {
+        kprintf("Assertion \"%s\" failed at %s:%d.\n", expr_str, file, line);
+        stop_cpu();
     }
 }

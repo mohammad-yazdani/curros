@@ -4,6 +4,7 @@
 #include "memory_layout.h"
 #include "print.h"
 #include "paging.h"
+#include "thread.h"
 #include "error.h"
 
 /**
@@ -49,9 +50,6 @@
 #define PIC2_COMMAND    (0xa0)
 #define PIC2_DATA    (PIC2_COMMAND+1)
 
-#define INTR_VEC_TIMER    (50)
-#define INTR_VEC_SPURIOUS (255)
-
 #define APIC_REG_SPURIOUS (0xF0)
 #define APIC_REG_TIMER (0x320)
 #define APIC_REG_EOI (0xB0)
@@ -61,14 +59,25 @@
 #define APIC_REG_ID (0x20)
 #define APIC_REG_LINT0 (0x350)
 #define APIC_REG_LINT1 (0x360)
+#define APIC_REG_ICR (0x300)
+
+#define IPI_DLM_FIXED (0 << 8)
+#define IPI_DLM_START_UP (6 << 8)
+
+#define IPI_DSM_PHYS (0 << 11)
+#define IPI_DSM_LOGI (1 << 11)
+#define IPI_STATUS_MASK (1 << 12)
+
+#define IPI_LVL_ASS (1 << 15)
+#define IPI_LVL_DEA (0 << 15)
 
 // base on 1Ghz CPU
-#define APIC_TIMER_INIT_CNT (10000000)
+#define APIC_TIMER_INIT_CNT (100000000)
 #define REG_SPURIOUS_APIC_ENABLE (1 << 8)
 
-extern void* intr_stub_array[NUM_IDT_DESC];
+extern void *intr_stub_array[NUM_IDT_DESC];
 
-static uintptr apic_base;
+static void *apic_base;
 static struct gdtr gdtptr;
 static struct idtr idtptr;
 static struct gdt_desc gdt[NUM_GDT_DESC];
@@ -130,18 +139,29 @@ static void disable_pic()
 
 static void write_apic_reg(uint32 reg, uint32 val)
 {
-    *(uint32 *) (apic_base + reg) = val;
+    *(uint32 *) ((uintptr) apic_base + reg) = val;
+}
+
+static void write_apic_reg_64(uint32 reg, uint64 val)
+{
+    *(uint64 *) ((uintptr) apic_base + reg) = val;
 }
 
 static uint32 read_apic_reg(uint32 reg)
 {
-    return *(uint32 *) (apic_base + reg);
+    return *(uint32 *) ((uintptr) apic_base + reg);
+}
+
+static uint64 read_apic_reg_64(uint32 reg)
+{
+    return *(uint64 *) ((uintptr) apic_base + reg);
 }
 
 static int32 init_apic()
 {
     uint32 eax = 1, ebx, ecx, edx;
     cpuid(&eax, &ebx, &ecx, &edx);
+
     if (!(edx & EDX_MASK_APIC))
     {
         return ENOSUPPORT;
@@ -152,11 +172,10 @@ static int32 init_apic()
     // hardware enable APIC
     ecx = MSR_APIC_BASE;
     read_msr(&ecx, &edx, &eax);
-    apic_base = (uintptr)R_PADDR(eax & 0xFFFF0000);
+    apic_base = R_PADDR(eax & 0xFFFF0000);
     eax |= MSR_MASK_APIC;
     write_msr(&ecx, &edx, &eax);
-    kprintf("APIC base address: 0x%x\n", (uint64)apic_base);
-    kprintf("Core id: %d\n", (uint64)read_apic_reg(APIC_REG_ID));
+    kprintf("APIC base address: 0x%x\n", (uint64) apic_base);
 
     // map spurious interrupt and software enable APIC
     uint32 reg = read_apic_reg(APIC_REG_SPURIOUS);
@@ -182,6 +201,32 @@ static int32 init_apic()
     return ESUCCESS;
 }
 
+static void *timer_intr_handler(struct intr_frame *frame)
+{
+    struct tcb *cur = get_cur_thread();
+
+    if(cur != NULL)
+    {
+        // hack to get away first scheduling 1st time
+        // save the stack pointer of the current thread
+        cur->rsp0 = (uint64) frame;
+    }
+
+    // run the scheduler
+    thread_schedule();
+
+    cur = get_cur_thread();
+    // now cur is the next thread to run
+    // swap address space
+    // which shouldn't page fault as we are in kernel
+    write_cr3(cur->proc->cr3);
+    flush_tlb();
+
+    // now we are in the target address space
+    // the only thing to do is to switch stack, which will be done in ASM handler
+    return (void *) cur->rsp0;
+}
+
 int32 intr_init()
 {
     int32 ret;
@@ -202,11 +247,10 @@ int32 intr_init()
                    SEG_TYPE_DATA_RW); // user data
 
     gdtptr.size = GDT_SIZE - 1;
-    gdtptr.offset = (uintptr)gdt;
-    BOCHS_BREAK;
+    gdtptr.offset = (uintptr) gdt;
     flush_gdt(&gdtptr, SEL(GDT_K_CODE, 0, 0), SEL(GDT_K_DATA, 0, 0));
 
-    idtptr.offset = (uintptr)idt;
+    idtptr.offset = (uintptr) idt;
     idtptr.size = IDT_SIZE - 1;
     for (int i = 0; i < NUM_IDT_DESC; i++)
     {
@@ -218,11 +262,15 @@ int32 intr_init()
     flush_idt(&idtptr);
     ret = init_apic();
 
-    if(ret == ESUCCESS)
+    if (ret == ESUCCESS)
     {
-        kprintf("Enabling interrupt...\n");
+        // enable interrupt flag but mask all external interrupts
+        WRITE_IRQ(0xf);
         sti();
+
+        set_intr_handler(INTR_VEC_TIMER, timer_intr_handler);
     }
+
     return ret;
 }
 
@@ -231,25 +279,69 @@ void set_intr_handler(uint32 vec, intr_handler handler)
     intr_disp_tbl[vec] = handler;
 }
 
-void intr_dispatcher(uint32 vec, struct intr_frame *frame)
+void stop_cpu()
 {
+    // stop interrupt and halt
+    cli();
+    hlt();
+}
+
+// this returns info returned by intr_disp_tbl
+// in case the assembly stub needs them (e.g. ctx swap)
+void *intr_dispatcher(uint32 vec, struct intr_frame *frame)
+{
+    void *ret = NULL;
+
     if (intr_disp_tbl[vec] != NULL)
     {
-        intr_disp_tbl[vec](vec, frame);
+        ret = intr_disp_tbl[vec](frame);
     }
     else
     {
-        kprintf("[PANIC] Interrupt %d has no handler. RIP: 0x%x\n", (uint64) vec, (uint64) frame->rip);
+        if (vec <= INTR_LIMIT_INTEL)
+        {
+            kprintf("[PANIC] Exception %d has no handler. RIP: 0x%x  ERR:0x%x\n", (uint64) vec, (uint64) frame->rip,
+                    (uint64) frame->error_code);
+            stop_cpu();
+        }
+        else
+        {
+            kprintf("[WARN] Interrupt %d has no handler. RIP: 0x%x\n", (uint64) vec, (uint64) frame->rip);
+        }
     }
 
-    if(vec >= INTR_VEC_TIMER && vec != INTR_VEC_SPURIOUS)
+    if (vec >= INTR_VEC_TIMER && vec != INTR_VEC_SPURIOUS)
     {
         // if it's delivered by local APIC, signal EOI
         write_apic_reg(APIC_REG_EOI, 0);
     }
+
+    return ret;
 }
 
-uint32 get_core()
+static uint32 get_core()
 {
-    return 0;
+    return read_apic_reg(APIC_REG_ID) >> 24;
 }
+
+
+void send_ipi(uint32 vec)
+{
+    // we decide to not support multicore for now. So hardcode to the current core
+    // used to emulate IO stuff
+    uint64 reg = ((uint64) get_core() << 56) | IPI_DLM_FIXED | IPI_DSM_PHYS | IPI_LVL_ASS | (vec & 0xff);
+
+    // block all interrupts because there is no context
+    uint64 irq = READ_IRQ();
+    WRITE_IRQ(0xf);
+
+    write_apic_reg_64(APIC_REG_ICR, reg);
+    // block until successfully delivered
+    while (!(reg & IPI_STATUS_MASK))
+    {
+        reg = read_apic_reg_64(APIC_REG_ICR);
+    }
+
+    WRITE_IRQ(irq);
+}
+

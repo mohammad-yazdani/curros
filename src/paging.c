@@ -7,16 +7,10 @@
 
 #define ENTRY_SIZE (8)
 
-
-#define PML4_ENTRY(vaddr) ((vaddr >> 39) & 0x1FF)
-#define PDPT_ENTRY(vaddr) ((vaddr >> 30) & 0x1FF)
-#define PD_ENTRY(vaddr) ((vaddr >> 21) & 0x1FF)
-#define PT_ENTRY(vaddr) ((vaddr >> 12) & 0x1FF)
-
 #define NEXT_LEVEL_MASK bit_field_mask(12,51)
 
 #define BIT_PRESENT (1ull)
-#define BIT_WRITE (1ull << 1)
+#define BIT_WRITEABLE (1ull << 1)
 #define BIT_USER (1ull << 2)
 #define BIT_WRITE_THROUGH (1ull << 3)
 #define BIT_CACHE_DISABLED (1ull << 4)
@@ -66,25 +60,23 @@ static int32 ensure_present(uint64 *entry, uint64 attr, uintptr *alloc)
     return ret;
 }
 
-int32 map_vmem(uintptr vaddr, uintptr paddr)
+int32 map_vmem(uint64 cr3, uintptr vaddr, uintptr paddr)
 {
     int32 ret;
 
-    vaddr &= 0xfff;
-    paddr &= 0xfff;
-
-    uint64 cr3 = read_cr3();
+    vaddr &= ~(uintptr)0xfff;
+    paddr &= ~(uintptr)0xfff;
 
     uint64 *pml4_e = R_PADDR(cr3 + ENTRY_SIZE * PML4_ENTRY(vaddr));
     uintptr pdpt_alloc = (uintptr) NULL;
-    ret = ensure_present(pml4_e, BIT_PRESENT | BIT_WRITE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pdpt_alloc);
+    ret = ensure_present(pml4_e, BIT_PRESENT | BIT_WRITEABLE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pdpt_alloc);
 
     uint64 *pdpt_e = NULL;
     uintptr pd_alloc = (uintptr) NULL;
     if (ret == ESUCCESS)
     {
         pdpt_e = R_PADDR((*pml4_e & NEXT_LEVEL_MASK) + ENTRY_SIZE * PDPT_ENTRY(vaddr));
-        ret = ensure_present(pdpt_e, BIT_PRESENT | BIT_WRITE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pd_alloc);
+        ret = ensure_present(pdpt_e, BIT_PRESENT | BIT_WRITEABLE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pd_alloc);
     }
 
     uint64 *pd_e = NULL;
@@ -92,13 +84,13 @@ int32 map_vmem(uintptr vaddr, uintptr paddr)
     if (ret == ESUCCESS)
     {
         pd_e = R_PADDR((*pdpt_e & NEXT_LEVEL_MASK) + ENTRY_SIZE * PD_ENTRY(vaddr));
-        ret = ensure_present(pd_e, BIT_PRESENT | BIT_WRITE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pt_alloc);
+        ret = ensure_present(pd_e, BIT_PRESENT | BIT_WRITEABLE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER), &pt_alloc);
     }
 
     if (ret == ESUCCESS)
     {
         uint64 *pt_e = R_PADDR((*pd_e & NEXT_LEVEL_MASK) + ENTRY_SIZE * PT_ENTRY(vaddr));
-        write_page_table(pt_e, paddr, BIT_PRESENT | BIT_WRITE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER));
+        write_page_table(pt_e, paddr, BIT_PRESENT | BIT_WRITEABLE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER));
     }
 
     if (ret != ESUCCESS)
@@ -122,9 +114,8 @@ int32 map_vmem(uintptr vaddr, uintptr paddr)
     return ret;
 }
 
-uintptr get_paddr(uintptr vaddr)
+uintptr get_paddr(uint64 cr3, uintptr vaddr)
 {
-    uintptr cr3 = read_cr3();
     uint64 pml4_e = *(uint64 *) R_PADDR(cr3 + ENTRY_SIZE * PML4_ENTRY(vaddr));
 
     if (!(pml4_e & BIT_PRESENT))
