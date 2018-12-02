@@ -57,6 +57,9 @@ proccess_tag(mtag *tag)
             base_tag = (struct multiboot_tag_load_base_addr *) tag;
             (void) base_tag;
             break;
+        case 15:
+            // acpi table
+
         default:
             break;
     }

@@ -7,8 +7,6 @@
 #include "thread.h"
 #include "error.h"
 
-#define INTR_LIMIT_INTEL (31)
-
 /**
  * IDT Defns
  */
@@ -163,6 +161,7 @@ static int32 init_apic()
 {
     uint32 eax = 1, ebx, ecx, edx;
     cpuid(&eax, &ebx, &ecx, &edx);
+
     if (!(edx & EDX_MASK_APIC))
     {
         return ENOSUPPORT;
@@ -177,7 +176,6 @@ static int32 init_apic()
     eax |= MSR_MASK_APIC;
     write_msr(&ecx, &edx, &eax);
     kprintf("APIC base address: 0x%x\n", (uint64) apic_base);
-    kprintf("Current core: %d\n", get_core());
 
     // map spurious interrupt and software enable APIC
     uint32 reg = read_apic_reg(APIC_REG_SPURIOUS);
@@ -288,6 +286,8 @@ void stop_cpu()
     hlt();
 }
 
+// this returns info returned by intr_disp_tbl
+// in case the assembly stub needs them (e.g. ctx swap)
 void *intr_dispatcher(uint32 vec, struct intr_frame *frame)
 {
     void *ret = NULL;
@@ -319,17 +319,17 @@ void *intr_dispatcher(uint32 vec, struct intr_frame *frame)
     return ret;
 }
 
-uint32 get_core()
+static uint32 get_core()
 {
-    uint32 eax = 1, ebx, ecx, edx;
-    cpuid(&eax, &ebx, &ecx, &edx);
-    return ebx >> 24;
+    return read_apic_reg(APIC_REG_ID) >> 24;
 }
 
 
-void send_ipi(uint32 coreid, uint32 vec)
+void send_ipi(uint32 vec)
 {
-    uint64 reg = ((uint64) coreid << 56) | IPI_DLM_FIXED | IPI_DSM_PHYS | IPI_LVL_ASS | (vec & 0xff);
+    // we decide to not support multicore for now. So hardcode to the current core
+    // used to emulate IO stuff
+    uint64 reg = ((uint64) get_core() << 56) | IPI_DLM_FIXED | IPI_DSM_PHYS | IPI_LVL_ASS | (vec & 0xff);
 
     // block all interrupts because there is no context
     uint64 irq = READ_IRQ();

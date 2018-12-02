@@ -17,7 +17,7 @@ enum
 };
 
 static uint32 thread_id;
-static struct tcb *cur_thread[NUM_CORES];
+static struct tcb *cur_thread;
 static struct llist thread_list;
 static struct spin_lock thread_list_lock;
 
@@ -29,14 +29,12 @@ void list_threads()
     {
         tcb = OBTAIN_STRUCT_ADDR(node, struct tcb, list_node);
         // reading no need to lock thread lock
-        kprintf("Thread - %d\n", (uint64)tcb->tid);
+        kprintf("Thread %d\n", (uint64)tcb->tid);
         node = lb_llist_next(node);
     }
-
-    return;
 }
 
-struct tcb *get_tcb_by_id(uint32 tid)
+static struct tcb *get_tcb_by_id(uint32 tid)
 {
     // the thread list lock must be held
     struct llist_node *node = lb_llist_first(&thread_list);
@@ -76,7 +74,7 @@ int32 thread_get_exit_code(uint32 tid, int32 *exit_code)
             *exit_code = tcb->exit_code;
 
             // this is unfair but do it for now
-            thread_yield(tcb->core_id);
+            thread_yield();
         }
         else
         {
@@ -120,7 +118,7 @@ int32 thread_stop(uint32 tid, int32 code)
     {
         // well this is unfair
         // but do this for now
-        thread_yield(tcb->core_id);
+        thread_yield();
     }
 
     return ret;
@@ -133,7 +131,6 @@ int32 thread_stop(uint32 tid, int32 code)
 void thread_schedule()
 {
     // only timer interrupt context
-    uint32 core_id = get_core();
     spin_lock(&thread_list_lock);
 
     struct llist_node *node = lb_llist_first(&thread_list);
@@ -144,20 +141,14 @@ void thread_schedule()
     {
         struct tcb *next = OBTAIN_STRUCT_ADDR(node, struct tcb, list_node);
 
-        if (next->core_id != core_id)
-        {
-            // not for the current core
-            continue;
-        }
-
         // we are only checking states here so no need to worry
         // since thread_block always fires an timer interrupt, which will be served immediately after this returns
         // so even if someone else from another core blocks this thread during this window
         // this thread will get descheduled right after the current timer interrupt deasserts
         // the worst case is someone unblocked a thread right after we checked it, but it doesn't break integrity
-        if (next->state == THREAD_STATE_RDY && next != cur_thread[core_id])
+        if (next->state == THREAD_STATE_RDY && next != cur_thread)
         {
-            cur_thread[core_id] = next;
+            cur_thread = next;
             // stop looping, scheduler runs fast, although o(n)
             break;
         }
@@ -236,18 +227,37 @@ int32 thread_block(uint32 tid)
     if (ret == ESUCCESS)
     {
         // this is unfair but do it for now
-        thread_yield(tcb->core_id);
+        thread_yield();
     }
 
     return ret;
 }
 
-void thread_yield(uint32 core_id)
+void thread_yield()
 {
     // emulate a timer interrupt on target core
-    send_ipi(core_id, INTR_VEC_TIMER);
+    send_ipi(INTR_VEC_TIMER);
 }
 
+#define MODE_K (0)
+#define MODE_U (1)
+static void write_intr_frame(struct intr_frame* frame, uint32 mode, uint64 iret_addr, uint64 iret_stack, uint64 arg)
+{
+    uint64 dsel = mode == MODE_K ? SEL(GDT_K_DATA, 0, 0) : SEL(GDT_U_DATA, 0, 3);
+    uint64 csel = mode == MODE_K ? SEL(GDT_K_CODE, 0, 0) : SEL(GDT_U_CODE, 0, 3);
+    frame->ss = dsel;
+    frame->ds = dsel;
+    frame->es = dsel;
+    frame->fs = dsel;
+    frame->gs = dsel;
+    frame->cs = csel;
+    frame->rip = (uint64) iret_addr;
+    frame->rdi = arg;
+    frame->rsp = iret_stack;
+
+    // only set interrupt enable flag
+    frame->rflags = (0x200);
+}
 
 int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *tid)
 {
@@ -260,23 +270,21 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
         ret = ENOMEM;
     }
 
-    kprintf("tcb: 0x%x\n", tcb);
-
     // allocate thread kernel stack
     // 4k stack for now
     // no stack overflow
-    uint64 *kstack = NULL;
+    uint64 *kstack_top = NULL;
     if (ret == ESUCCESS)
     {
-        kstack = kalloc(THREAD_STACK_SIZE);
+        kstack_top = kalloc(THREAD_STACK_SIZE);
 
-        if (kstack == NULL)
+        if (kstack_top == NULL)
         {
             ret = ENOMEM;
         }
         else
         {
-            kstack = (uint64 *) ((uintptr) kstack + THREAD_STACK_SIZE);
+            kstack_top = (uint64 *) ((uintptr) kstack_top + THREAD_STACK_SIZE);
         }
     }
 
@@ -287,54 +295,25 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
         tcb->exit_code = 0;
         tcb->state = THREAD_STATE_RDY;
         tcb->proc = proc;
-        tcb->stack0 = kstack;
-        tcb->core_id = get_core();
+        tcb->stack0_top = kstack_top;
+        tcb->stack0_size = THREAD_STACK_SIZE;
 
         // write initial context information on the kernel stack
-        struct intr_frame *frame = (struct intr_frame *) ((uintptr) kstack - sizeof(struct intr_frame));
+        struct intr_frame *frame = (struct intr_frame *) ((uintptr) kstack_top - sizeof(struct intr_frame));
         mem_set(frame, 0, sizeof(struct intr_frame));
 
         // here we wanna check if the entrance is user mode
         if (IS_KERN_SPACE(func))
         {
-            // write seg registers
-            frame->ss = SEL(GDT_K_DATA, 0, 0);
-            frame->ds = SEL(GDT_K_DATA, 0, 0);
-            frame->es = SEL(GDT_K_DATA, 0, 0);
-            frame->fs = SEL(GDT_K_DATA, 0, 0);
-            frame->gs = SEL(GDT_K_DATA, 0, 0);
-            frame->cs = SEL(GDT_K_CODE, 0, 0);
-
-            // write parameters
-            frame->rdi = (uint64) args;
-            // let it use kstack after it pops iretq stuff out
-            frame->rsp = (uint64) kstack;
-
-            // write return info
-            // only set interrupt enable flag
-            frame->rflags = (0x200);
-            frame->rip = (uint64) func;
+            write_intr_frame(frame, MODE_K, (uint64)func, (uint64)kstack_top, (uint64)args);
         }
         else
         {
-            // write seg registers
-            frame->ss = SEL(GDT_U_DATA, 0, 3);
-            frame->ds = SEL(GDT_U_DATA, 0, 3);
-            frame->es = SEL(GDT_U_DATA, 0, 3);
-            frame->fs = SEL(GDT_U_DATA, 0, 3);
-            frame->gs = SEL(GDT_U_DATA, 0, 3);
-            frame->cs = SEL(GDT_U_CODE, 0, 3);
-
-            // write parameters
-            frame->rdi = (uint64) args;
-
-            // write return info
-            // only set interrupt enable flag
-            frame->rflags = (0x200);
-            frame->rip = (uint64) func;
+            KASSERT(FALSE);
+            write_intr_frame(frame, MODE_U, (uint64)func, (uint64)NULL, (uint64)args);
         }
 
-        // update kernel stack pointer
+        // update interrupt stack pointer
         tcb->rsp0 = (uint64) frame;
 
         // add to thread list
@@ -352,11 +331,7 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
 
 void thread_init()
 {
-    for (int i = 0; i < NUM_CORES; i++)
-    {
-        cur_thread[i] = NULL;
-    }
-
+    cur_thread = NULL;
     lb_llist_init(&thread_list);
     spin_init(&thread_list_lock);
     thread_id = 0;
@@ -364,5 +339,5 @@ void thread_init()
 
 struct tcb *get_cur_thread()
 {
-    return cur_thread[get_core()];
+    return cur_thread;
 }

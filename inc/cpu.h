@@ -31,9 +31,6 @@ void ASM_F hlt();
 
 uint64 ASM_F read_cr8();
 
-// hack
-uint64 ASM_F read_rsp();
-
 void ASM_F write_cr8(uint64 val);
 
 uint64 ASM_F read_cr3();
