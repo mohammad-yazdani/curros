@@ -1,4 +1,6 @@
 # CurrOS
+CurrOS is a simple x86-64 prototype kernel.
+CurrOS provides basic OS functions such as interrupt handling, memory management, processes and threads, and userspace. We tested CurrOS on QEMU.
 
 ## Toolchain
 
