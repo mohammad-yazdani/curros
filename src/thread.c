@@ -1,4 +1,5 @@
 #include <print.h>
+#include <paging.h>
 #include "thread.h"
 #include "error.h"
 #include "proc.h"
@@ -146,27 +147,28 @@ void thread_schedule()
         // first thread hack
         cur_thread = OBTAIN_STRUCT_ADDR(lb_llist_first(&thread_list), struct tcb, list_node);
     }
+
     KASSERT(cur_thread != NULL);
 
-    struct llist_node *node = lb_llist_next(&cur_thread->list_node);
-
-    if (node == NULL)
-    {
-        node = lb_llist_first(&thread_list);
-    }
-
+    struct llist_node *next_node = &cur_thread->list_node;
     // since there must be a null thread, node cannot be null
-    KASSERT(node != NULL);
-    while (node != NULL)
+    while (1)
     {
-        struct tcb *next = OBTAIN_STRUCT_ADDR(node, struct tcb, list_node);
+        // get the next tcb in a round robbin fashion
+        next_node = lb_llist_next(next_node);
+        if (next_node == NULL)
+        {
+            next_node = lb_llist_first(&thread_list);
+        }
+
+        struct tcb *next = OBTAIN_STRUCT_ADDR(next_node, struct tcb, list_node);
 
         // we are only checking states here so no need to worry
         // since thread_block always fires an timer interrupt, which will be served immediately after this returns
         // so even if someone else from another core blocks this thread during this window
         // this thread will get descheduled right after the current timer interrupt deasserts
         // the worst case is someone unblocked a thread right after we checked it, but it doesn't break integrity
-        if (next->state == THREAD_STATE_RDY && next != cur_thread)
+        if (next->state == THREAD_STATE_RDY)
         {
             cur_thread = next;
             // stop looping, scheduler runs fast, although o(n)
@@ -177,8 +179,6 @@ void thread_schedule()
             // zombie thread, should use ref count to properly deallocate stuff
             // TODO: clean up zombie threads
         }
-
-        node = lb_llist_next(node);
     }
 
     spin_unlock(&thread_list_lock);
@@ -291,7 +291,7 @@ static void write_intr_frame(struct intr_frame *frame, uint32 mode, uint64 iret_
     frame->rflags = (0x200);
 }
 
-int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *tid)
+int32 thread_create(struct pcb *proc, void *entry, void *args, uint32 *tid)
 {
     int32 ret = ESUCCESS;
 
@@ -305,21 +305,35 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
     // allocate thread kernel stack
     // 4k stack for now
     // no stack overflow
+    uintptr ustack = (uintptr) NULL;
+    uint64 *kstack = NULL;
     uint64 *kstack_top = NULL;
     if (ret == ESUCCESS)
     {
-        kstack_top = kalloc(THREAD_STACK_SIZE);
+        kstack = kalloc(THREAD_STACK_SIZE);
 
-        if (kstack_top == NULL)
+        if (kstack == NULL)
         {
             ret = ENOMEM;
         }
         else
         {
-            kstack_top = (uint64 *) ((uintptr) kstack_top + THREAD_STACK_SIZE);
+            kstack_top = (uint64 *) ((uintptr) kstack + THREAD_STACK_SIZE);
         }
     }
 
+    // allocate ustack always
+    if (ret == ESUCCESS)
+    {
+        ustack = (uintptr) pmalloc(THREAD_STACK_SIZE);
+
+        if (ustack == (uintptr) NULL)
+        {
+            ret = ENOMEM;
+        }
+    }
+
+    struct intr_frame *frame = NULL;
     if (ret == ESUCCESS)
     {
         tcb->tid = (uint32) xinc_32((int32 *) &thread_id, 1);
@@ -327,24 +341,35 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
         tcb->exit_code = 0;
         tcb->state = THREAD_STATE_RDY;
         tcb->proc = proc;
-        tcb->stack0_top = kstack_top;
-        tcb->stack0_size = THREAD_STACK_SIZE;
+        tcb->kstack = kstack;
+        tcb->kstack_sz = THREAD_STACK_SIZE;
+        tcb->ustack_sz = THREAD_STACK_SIZE;
+        tcb->ustack = ustack;
 
         // write initial context information on the kernel stack
-        struct intr_frame *frame = (struct intr_frame *) ((uintptr) kstack_top - sizeof(struct intr_frame));
+        frame = (struct intr_frame *) ((uintptr) kstack_top - sizeof(struct intr_frame));
         mem_set(frame, 0, sizeof(struct intr_frame));
 
         // here we wanna check if the entrance is user mode
-        if (IS_KERN_SPACE(func))
+        if (IS_KERN_SPACE(entry))
         {
-            write_intr_frame(frame, MODE_K, (uint64) func, (uint64) kstack_top, (uint64) args);
+            write_intr_frame(frame, MODE_K, (uint64) entry, (uint64) kstack_top, (uint64) args);
         }
         else
         {
-            KASSERT(FALSE);
-            write_intr_frame(frame, MODE_U, (uint64) func, (uint64) NULL, (uint64) args);
-        }
+            // map ustack to the user address space
+            ret = map_vmem(proc->cr3, U_STACK_VADDR, ustack);
 
+            if (ret == ESUCCESS)
+            {
+                write_intr_frame(frame, MODE_U, (uint64) entry, (uint64) (U_STACK_VADDR + THREAD_STACK_SIZE),
+                                 (uint64) args);
+            }
+        }
+    }
+
+    if (ret == ESUCCESS)
+    {
         // update interrupt stack pointer
         tcb->rsp0 = (uint64) frame;
 
@@ -354,6 +379,25 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
         lb_llist_push_back(&thread_list, &tcb->list_node);
         spin_unlock_irq_restore(&thread_list_lock, irq);
         *tid = tcb->tid;
+    }
+
+    if (ret != ESUCCESS)
+    {
+        // clean up
+        if (tcb != NULL)
+        {
+            kfree(tcb);
+        }
+
+        if (ustack != (uintptr) NULL)
+        {
+            pfree(ustack);
+        }
+
+        if (kstack != NULL)
+        {
+            kfree(kstack);
+        }
     }
 
     return ret;

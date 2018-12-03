@@ -415,17 +415,18 @@
        multiboot_uint32_t size;
        multiboot_uint32_t load_base_addr;
      };
-    
+
      /* CurrOS */
      typedef struct multiboot2_entry
      {
        uint32 total_size;
        uint32 reserved;
      } mbentry;
-       
+
      typedef struct multiboot_header mheader;
      typedef struct multiboot_header_tag htag;
-     void parse_mb2(mbentry * mb, void ** module, char ** ld_name);
+     typedef struct multiboot_tag_module mod_tag;
+     void parse_mb2(mbentry * mb, void ** module, char ** ld_name, uint64*, uint64*);
      /* CurrOS */
 
      #endif /*  ! ASM_FILE */

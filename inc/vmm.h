@@ -55,7 +55,7 @@ typedef struct page_table_entries
     usize free_frames;
 } vmem;
 
-void init_vm(struct spin_lock * vmlk);
+void init_vm();
 
 void vm_issue_unit(uint64 id, usize size);
 

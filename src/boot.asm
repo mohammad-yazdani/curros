@@ -177,26 +177,42 @@ sys_entry_64:
 	mov rax, .high
 	jmp rax
 .high:
-    ; set proper segment registers
+
+    ; set ds segment
     mov rax,init_gdt.data
-    mov ds,rax
-    mov es,rax
-    mov fs,rax
-    mov gs,rax
-    mov ss,rax
+    mov ds, rax
+
+	; map GDT into virtual address space
+	mov qword [init_gdt.ptr + 2], init_gdt
+	lgdt [init_gdt.ptr]
+
+	;reload cs
+    push qword init_gdt.data ; ss
+    push qword init_stack ; rsp
+    pushfq
+    push qword init_gdt.code ; cs
+    push qword .reload ; rip
+    iretq
+.reload:
+	mov rax, ss
+	mov ds, rax
+    mov es, rax
+    mov fs, rax
+    mov gs, rax
 
 	; unmap the first 4GB because we don't need them anymore
-    ;mov rax, GET_PADDR(init_pml4)
-    ;mov qword [rax], 0 ;
+    mov rax, GET_PADDR(init_pml4)
+    mov qword [rax], 0 ;
 
 	; flush TLB
-    ;mov rax, cr3
-    ;mov cr3, rax
+    mov rax, cr3
+    mov cr3, rax
 
 	; kernel is now in only -2GB mode
-    mov rsp, init_stack
     xor rdi, rdi
     mov edi, dword [multiboot_info_ptr]
+    mov rax, KERNEL_PMAP_VADDR
+    add rdi, rax
 
     call kmain
 .end:
@@ -245,7 +261,7 @@ init_gdt:                        ; Global Descriptor Table (long mode).
     dw 0                         ; Base (low).
     db 0                         ; Base (middle)
     db 10010010b                 ; Access (read/write).
-    db 00000000b                 ; Granularity.
+    db 00100000b                 ; Granularity.
     db 0                         ; Base (high).
 .ptr:
     ; GDT PTR

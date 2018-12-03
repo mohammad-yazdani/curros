@@ -385,14 +385,13 @@ void *kalloc(usize size)
         flush_tlb();
     }
 
-    kprintf("Allocated Virtual: 0x%x Size: %x\n", ret, (uint64) size);
+    kprintf("Allocated Virtual: 0x%x Size: %d\n", ret, (uint64) size);
 
     return ret;
 }
 
-void init_vm(struct spin_lock *vmlk)
+void init_vm()
 {
-    UNREFERENCED(vmlk);
     pointer = (void *) K_DYNAMIC;
     spin_init(&lock);
 }
@@ -428,7 +427,7 @@ kalloc2(usize size)
     else
     { ret = vm_alloc_multpages(size); }
     //void *ret = (void *) R_PADDR((paddr) vm_alloc(size, sector_id));
-    kprintf("Allocated Virtual: 0x%x Size: %x\n", ret, (uint64) size);
+    kprintf("Allocated Virtual: 0x%x Size: %d\n", ret, (uint64) size);
     /* Hack */
     int32 status = ESUCCESS;
     if (ret != NULL)

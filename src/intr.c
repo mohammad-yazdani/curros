@@ -262,6 +262,8 @@ int32 intr_init()
     flush_idt(&idtptr);
     ret = init_apic();
 
+    BOCHS_BREAK;
+
     if (ret == ESUCCESS)
     {
         // enable interrupt flag but mask all external interrupts

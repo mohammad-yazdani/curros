@@ -10,15 +10,11 @@
 #include "vmm.h"
 #include "elf64.h"
 
-typedef struct multiboot_tag_module mod_tag;
-
 void ktest1(void *arg);
 
 void ktest2(void *arg);
 
 void kproc(void *arg);
-
-void exec_test(void *entry, int32 *status);
 
 void pmm_test();
 
@@ -29,49 +25,33 @@ void kmain(mbentry *mb)
     int32 status;
 
     print_init();
-    intr_init();
 
     status = intr_init();
     KASSERT(status == ESUCCESS);
 
     char *ld_name = 0x0;
     mod_tag *module = 0x0;
-    parse_mb2(mb, (void **) (&module), &ld_name);
+    uint64 mem_low;
+    uint64 mem_high;
+    parse_mb2(mb, (void **) &module, &ld_name, &mem_low, &mem_high);
 
     kprintf("%s\n", ld_name);
-    kprintf("Module loaded starting at %X and ending at %X.\n", module->mod_start, module->mod_end);
+    kprintf("Module loaded at 0x%x size %d.\n", (uint64) module->mod_start,
+            (uint64) (module->mod_end - module->mod_start));
 
-    void *exec_entry = elf_load_file((void *) module->mod_start);
-    kprintf("Executable load from module file. Entry at: %X\n", exec_entry);
+    pmm_init(mem_low, mem_high);
 
-    struct spin_lock pmlk = {0};
-    struct spin_lock vmlk = {0};
+    init_vm();
 
-    pmm_init(&pmlk);
-//	pmm_test();
-
-    init_vm(&vmlk);
-//	vmm_test();
-
-    proc_init();
     thread_init();
-
-    // start proc 0, which is kernel proc, also null proc
-    uint32 id;
-    status = proc_create(kproc, &id);
+    status = proc_init((void*)kproc);
     KASSERT(status == ESUCCESS);
 
     // unmask all interrupts
     WRITE_IRQ(0x0);
 
-    while (1)
-    {
-
-    }
-
-    // wait for timer interrupt to fire and schedule the first thread
-    while (1)
-    {}
+    send_ipi(INTR_VEC_TIMER);
+    KASSERT(FALSE);
 }
 
 
@@ -84,7 +64,7 @@ void ktest1(void *arg)
     uint64 i = 0;
     while (i != 0xFFFFFFFFFF)
     {
-        poor_sleep(1000000);
+        poor_sleep(5000000);
         kprintf("thread1...%d\n", i);
 
         if (i == 10)
@@ -113,7 +93,7 @@ void ktest2(void *arg)
     int32 ex;
     while (i != 0xFFFFFFFFFF)
     {
-        poor_sleep(1000000);
+        poor_sleep(5000000);
         kprintf("thread2...%d\n", i);
 
         if (thread_get_exit_code(t1id, &ex) == ESUCCESS)
@@ -127,29 +107,18 @@ void ktest2(void *arg)
 
 void kproc(void *arg)
 {
+    // the idle thread
     UNREFERENCED(arg);
     int32 status;
-    status = thread_create(get_cur_thread()->proc, ktest1, NULL, &t1id);
+    status = thread_create(get_cur_thread()->proc, (void *) ktest1, NULL, &t1id);
     kprintf("Create thread1 %d\n", (uint64) status);
-    status = thread_create(get_cur_thread()->proc, ktest2, NULL, &t2id);
+    status = thread_create(get_cur_thread()->proc, (void *) ktest2, NULL, &t2id);
     kprintf("Create thread2 %d\n", (uint64) status);
     while (1)
     {
-        //kprintf("Idle thread\n");
+        kprintf("Idle thread\n");
         thread_yield();
     }
-}
-
-void
-exec_test(void *entry, int32 *status)
-{
-    uint32 id;
-    *status = proc_create((void (*)(void *)) entry, &id);
-    KASSERT((*status) == ESUCCESS);
-    kprintf("Program execution successful.\n");
-
-    // unmask all interrupts
-    WRITE_IRQ(0x0);
 }
 
 void

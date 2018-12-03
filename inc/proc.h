@@ -14,7 +14,9 @@ struct pcb
 };
 
 // procs now are simply cr3 holders
+int32 proc_create(void* elf64, uint32* proc_id);
 
-int32 proc_create(void (*func)(void*), uint32* proc_id);
 
-void proc_init();
+// proc init also makes the current address space process 0
+// and creates a thread to run k_routine
+int32 proc_init(void* k_routine);

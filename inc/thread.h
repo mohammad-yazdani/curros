@@ -9,8 +9,10 @@ struct tcb
     int32 exit_code;
     uint32 state;
 
-    void* stack0_top;
-    uint64 stack0_size;
+    uintptr ustack;
+    usize ustack_sz;
+    void* kstack;
+    usize kstack_sz;
 
     uint64 rsp0; // kernel stack pointer for the stack, has context information
     struct spin_lock lock;
@@ -23,7 +25,7 @@ int32 thread_stop(uint32 tid, int32 code);
 
 void list_threads();
 
-int32 thread_create(struct pcb* proc, void (*entry)(void*), void* args, uint32* tid);
+int32 thread_create(struct pcb* proc, void* entry, void* args, uint32* tid);
 
 void thread_init();
 

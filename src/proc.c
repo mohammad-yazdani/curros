@@ -3,6 +3,7 @@
 #include "pmm.h"
 #include "vmm.h"
 #include "thread.h"
+#include "elf64.h"
 #include "cpu.h"
 #include "paging.h"
 #include "memory_layout.h"
@@ -11,14 +12,40 @@ static struct spin_lock proc_list_lock;
 static struct llist proc_list;
 static uint32 proc_id;
 
-void proc_init()
+int32 proc_init(void* k_routine)
 {
+    uint32 tid;
+    int32 ret = ESUCCESS;
     spin_init(&proc_list_lock);
     lb_llist_init(&proc_list);
     proc_id = 0;
+
+    // hack to make the first process
+    struct pcb *pcb = kalloc(sizeof(struct pcb));
+    if (pcb == NULL)
+    {
+        ret = ENOMEM;
+    }
+
+    if (ret == ESUCCESS)
+    {
+        pcb->cr3 = read_cr3();
+        pcb->proc_id = (uint32) xinc_32((int32 *) &proc_id, 1);
+        spin_init(&pcb->lock);
+        lb_llist_init(&pcb->threads);
+
+        ret = thread_create(pcb, k_routine, NULL, &tid);
+    }
+
+    if (ret != ESUCCESS)
+    {
+        kfree(pcb);
+    }
+
+    return ret;
 }
 
-int32 proc_create(void (*func)(void*), uint32 *pid)
+int32 proc_create(void* elf64, uint32 *pid)
 {
     int32 ret = ESUCCESS;
 
@@ -40,6 +67,7 @@ int32 proc_create(void (*func)(void*), uint32 *pid)
         }
     }
 
+    void* entry = NULL;
     bool pushed = FALSE;
     if (ret == ESUCCESS)
     {
@@ -55,8 +83,7 @@ int32 proc_create(void (*func)(void*), uint32 *pid)
 
         uint64 *pml4 = R_PADDR(cr3);
         // identity map the kernel space
-        // PML4_ENTRY(K_START)
-        for (uint32 i = 0; i < 512; i++)
+        for (uint32 i = PML4_ENTRY(K_START); i < 512; i++)
         {
             pml4[i] = cur_pml4[i];
         }
@@ -67,9 +94,14 @@ int32 proc_create(void (*func)(void*), uint32 *pid)
         spin_unlock(&proc_list_lock);
         pushed = TRUE;
 
+        ret = elf_load_file(pcb, elf64, &entry);
+    }
+
+    if (ret == ESUCCESS)
+    {
         // create the thread
         uint32 tid;
-        ret = thread_create(pcb, func, NULL, &tid);
+        ret = thread_create(pcb, entry, (void*)0x13141516, &tid);
     }
 
     if (ret == ESUCCESS)
@@ -89,6 +121,7 @@ int32 proc_create(void (*func)(void*), uint32 *pid)
             kfree(pcb);
         }
 
+        // need to properly unmap everything
         if (cr3 != (uintptr) NULL)
         {
             pfree(cr3);
