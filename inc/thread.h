@@ -35,4 +35,6 @@ void thread_yield();
 
 int32 thread_resume(uint32 tid);
 
+void thread_exit(int32 code);
+
 int32 thread_block(uint32 tid);

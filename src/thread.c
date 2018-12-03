@@ -6,8 +6,9 @@
 #include "vmm.h"
 #include "cpu.h"
 #include "intr.h"
+#include "memory_layout.h"
 
-#define THREAD_STACK_SIZE (2048)
+#define THREAD_STACK_SIZE (PAGE_SIZE)
 
 enum
 {
@@ -29,7 +30,7 @@ void list_threads()
     {
         tcb = OBTAIN_STRUCT_ADDR(node, struct tcb, list_node);
         // reading no need to lock thread lock
-        kprintf("Thread %d\n", (uint64)tcb->tid);
+        kprintf("Thread %d\n", (uint64) tcb->tid);
         node = lb_llist_next(node);
     }
 }
@@ -124,6 +125,13 @@ int32 thread_stop(uint32 tid, int32 code)
     return ret;
 }
 
+void set_cur_thread(struct tcb *t)
+{
+    // first time setting
+    KASSERT(cur_thread == NULL);
+    cur_thread = t;
+}
+
 // this guy picks the next thread to run
 // by updating cur_thread
 // timer interrupt always
@@ -133,7 +141,19 @@ void thread_schedule()
     // only timer interrupt context
     spin_lock(&thread_list_lock);
 
-    struct llist_node *node = lb_llist_first(&thread_list);
+    if (cur_thread == NULL)
+    {
+        // first thread hack
+        cur_thread = OBTAIN_STRUCT_ADDR(lb_llist_first(&thread_list), struct tcb, list_node);
+    }
+    KASSERT(cur_thread != NULL);
+
+    struct llist_node *node = lb_llist_next(&cur_thread->list_node);
+
+    if (node == NULL)
+    {
+        node = lb_llist_first(&thread_list);
+    }
 
     // since there must be a null thread, node cannot be null
     KASSERT(node != NULL);
@@ -164,6 +184,17 @@ void thread_schedule()
     spin_unlock(&thread_list_lock);
 }
 
+void thread_exit(int32 code)
+{
+    spin_lock(&cur_thread->lock);
+    KASSERT(cur_thread->state == THREAD_STATE_RDY);
+    cur_thread->exit_code = code;
+    cur_thread->state = THREAD_STATE_ZOM;
+    spin_unlock(&cur_thread->lock);
+    thread_yield();
+    // shouldn't get here
+    KASSERT(FALSE);
+}
 
 int32 thread_resume(uint32 tid)
 {
@@ -241,7 +272,8 @@ void thread_yield()
 
 #define MODE_K (0)
 #define MODE_U (1)
-static void write_intr_frame(struct intr_frame* frame, uint32 mode, uint64 iret_addr, uint64 iret_stack, uint64 arg)
+
+static void write_intr_frame(struct intr_frame *frame, uint32 mode, uint64 iret_addr, uint64 iret_stack, uint64 arg)
 {
     uint64 dsel = mode == MODE_K ? SEL(GDT_K_DATA, 0, 0) : SEL(GDT_U_DATA, 0, 3);
     uint64 csel = mode == MODE_K ? SEL(GDT_K_CODE, 0, 0) : SEL(GDT_U_CODE, 0, 3);
@@ -305,12 +337,12 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
         // here we wanna check if the entrance is user mode
         if (IS_KERN_SPACE(func))
         {
-            write_intr_frame(frame, MODE_K, (uint64)func, (uint64)kstack_top, (uint64)args);
+            write_intr_frame(frame, MODE_K, (uint64) func, (uint64) kstack_top, (uint64) args);
         }
         else
         {
             KASSERT(FALSE);
-            write_intr_frame(frame, MODE_U, (uint64)func, (uint64)NULL, (uint64)args);
+            write_intr_frame(frame, MODE_U, (uint64) func, (uint64) NULL, (uint64) args);
         }
 
         // update interrupt stack pointer
@@ -318,11 +350,9 @@ int32 thread_create(struct pcb *proc, void (*func)(void *), void *args, uint32 *
 
         // add to thread list
         uint64 irq;
-        list_threads();
         irq = spin_lock_irq_save(&thread_list_lock);
         lb_llist_push_back(&thread_list, &tcb->list_node);
         spin_unlock_irq_restore(&thread_list_lock, irq);
-
         *tid = tcb->tid;
     }
 

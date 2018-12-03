@@ -1,3 +1,4 @@
+#include <print.h>
 #include "memory_layout.h"
 #include "pmm.h"
 
@@ -165,6 +166,7 @@ pmalloc(uint32 size)
 
     spin_unlock(pm_global_lock);
 
+    kprintf("Allocated Physical: 0x%x Size: %x\n", new_alloc_paddr, (uint64)size);
     return (void *) new_alloc_paddr;
 }
 

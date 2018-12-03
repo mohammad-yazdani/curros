@@ -72,7 +72,7 @@
 #define IPI_LVL_DEA (0 << 15)
 
 // base on 1Ghz CPU
-#define APIC_TIMER_INIT_CNT (100000000)
+#define APIC_TIMER_INIT_CNT (10000000)
 #define REG_SPURIOUS_APIC_ENABLE (1 << 8)
 
 extern void *intr_stub_array[NUM_IDT_DESC];
@@ -337,7 +337,7 @@ void send_ipi(uint32 vec)
 
     write_apic_reg_64(APIC_REG_ICR, reg);
     // block until successfully delivered
-    while (!(reg & IPI_STATUS_MASK))
+    while (reg & IPI_STATUS_MASK)
     {
         reg = read_apic_reg_64(APIC_REG_ICR);
     }
