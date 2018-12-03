@@ -1,4 +1,4 @@
-# curros
+# CurrOS
 
 ## Toolchain
 
@@ -21,3 +21,6 @@ make
 
 ## Clean
 make clean
+
+## Paper 
+https://github.com/mohammad-yazdani/curros/wiki/Project-Paper
