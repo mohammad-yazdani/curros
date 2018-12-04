@@ -17,6 +17,8 @@ void ASM_F flush_gdt(void *gdt_ptr, uint16 code_slct, uint16 data_slct);
 
 void ASM_F flush_idt(void *idt_ptr);
 
+void ASM_F flush_tss(uint16 tss_slct);
+
 void ASM_F cpuid(uint32 *eax, uint32 *ebx, uint32 *ecx, uint32 *edx);
 
 void ASM_F read_msr(uint32 *ecx, uint32 *edx, uint32 *eax);

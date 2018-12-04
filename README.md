@@ -1,28 +1,14 @@
-# CurrOS
-CurrOS is a simple x86-64 prototype kernel.
-CurrOS provides basic OS functions such as interrupt handling, memory management, processes and threads, and userspace. We tested CurrOS on QEMU.
+# CurrSOS
+CurrSOS is a simple x86-64 kernel that supports interrupt, memory management, processes and threads, userspace and system calls. It has vastly simplier but not better memory management than its successor CurrOS.
 
 ## Toolchain
-
 clang, lld, xorriso, grub-pc-bin, nasm
 
-## Emulation
-
-### Qemu
-Install qemu
-
-Boot from out/curros.iso
-
-### Bochs
-Install bochs, bochs-x
-
-Run "bochs -f bochsrc" at root dir
-
 ## Build
-make
+Run make inside "user" directory to build the test user program.
+Run make in root dir and boot from out/curros.iso
 
 ## Clean
 make clean
-
-## Paper 
-https://github.com/mohammad-yazdani/curros/wiki/Project-Paper
+cd user 
+make clean

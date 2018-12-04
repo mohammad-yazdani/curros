@@ -182,6 +182,9 @@ void thread_schedule()
     }
 
     spin_unlock(&thread_list_lock);
+#ifdef KDBG
+    kprintf("[Scheduler] Next Proc: %d. Next Thread: %d\n", (uint64)cur_thread->proc->proc_id, (uint64)cur_thread->tid);
+#endif
 }
 
 void thread_exit(int32 code)

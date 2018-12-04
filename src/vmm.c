@@ -36,8 +36,8 @@ get_index(vaddr address)
 vm_node *
 get_alloc_node()
 {
-    vm_node * alloc = R_PADDR((paddr)pmalloc(sizeof(vm_node)));
-    vm_atom * atom = R_PADDR((paddr)pmalloc(sizeof(vm_atom)));
+    vm_node * alloc = R_PADDR((paddr)pmalloc(PAGE_SIZE));
+    vm_atom * atom = R_PADDR((paddr)pmalloc(PAGE_SIZE));
     alloc->data = atom;
 
     return alloc;
@@ -56,7 +56,8 @@ vm_alloc(usize size, uint8 sector_id)
                 if (obj->allocs.head) {
                     vm_node *head_node = obj->allocs.head;
                     vm_atom *head_atom = head_node->data;
-                    offset += head_atom->offset + head_atom->size;
+                    if (head_atom) offset += head_atom->offset + head_atom->size;
+                    else continue;
                 }
 
                 vm_node *node = get_alloc_node();
@@ -349,7 +350,9 @@ void *kalloc2(usize size)
         flush_tlb();
     }
 
+#ifdef KDBG
     kprintf("Allocated Virtual: 0x%x Size: %d\n", ret, (uint64) size);
+#endif
 
     return ret;
 }
@@ -448,13 +451,6 @@ kfree(void *ptr)
         if (atom->offset == offset && atom->page_ptr == page)
         {
             page->free += atom->size;
-
-            /*vm_node * prev = head->prev;
-            if (!prev) {
-                page->allocs.head = head->next;
-            } else {
-                prev->next = head->next;
-            }*/
 
             lb_llist_remove_by_ref(&(page->allocs), tail);
 

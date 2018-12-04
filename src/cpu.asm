@@ -22,6 +22,12 @@ global read_cr3
 global write_cr3
 global flush_tlb
 global hlt
+global flush_tss
+
+flush_tss:
+mov ax, di
+ltr ax
+ret
 
 hlt:
 hlt

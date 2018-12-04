@@ -59,7 +59,8 @@
 #define APIC_REG_ID (0x20)
 #define APIC_REG_LINT0 (0x350)
 #define APIC_REG_LINT1 (0x360)
-#define APIC_REG_ICR (0x300)
+#define APIC_REG_ICR_L (0x300)
+#define APIC_REG_ICR_H (0x310)
 
 #define IPI_DLM_FIXED (0 << 8)
 #define IPI_DLM_START_UP (6 << 8)
@@ -78,6 +79,7 @@
 extern void *intr_stub_array[NUM_IDT_DESC];
 
 static void *apic_base;
+static struct tss utss;
 static struct gdtr gdtptr;
 static struct idtr idtptr;
 static struct gdt_desc gdt[NUM_GDT_DESC];
@@ -142,19 +144,9 @@ static void write_apic_reg(uint32 reg, uint32 val)
     *(uint32 *) ((uintptr) apic_base + reg) = val;
 }
 
-static void write_apic_reg_64(uint32 reg, uint64 val)
-{
-    *(uint64 *) ((uintptr) apic_base + reg) = val;
-}
-
 static uint32 read_apic_reg(uint32 reg)
 {
     return *(uint32 *) ((uintptr) apic_base + reg);
-}
-
-static uint64 read_apic_reg_64(uint32 reg)
-{
-    return *(uint64 *) ((uintptr) apic_base + reg);
 }
 
 static int32 init_apic()
@@ -175,7 +167,9 @@ static int32 init_apic()
     apic_base = R_PADDR(eax & 0xFFFF0000);
     eax |= MSR_MASK_APIC;
     write_msr(&ecx, &edx, &eax);
+#ifdef KDBG
     kprintf("APIC base address: 0x%x\n", (uint64) apic_base);
+#endif
 
     // map spurious interrupt and software enable APIC
     uint32 reg = read_apic_reg(APIC_REG_SPURIOUS);
@@ -186,8 +180,6 @@ static int32 init_apic()
     write_apic_reg(APIC_REG_LINT0, reg | (1 << 16));
     reg = read_apic_reg(APIC_REG_LINT1);
     write_apic_reg(APIC_REG_LINT1, reg | (1 << 16));
-
-    kprintf("Initializing APIC timer...\n");
 
     // configure APIC timer
     write_apic_reg(APIC_REG_TIMER_DIV, 0xB); // 0x1011, divide by 1
@@ -205,7 +197,7 @@ static void *timer_intr_handler(struct intr_frame *frame)
 {
     struct tcb *cur = get_cur_thread();
 
-    if(cur != NULL)
+    if (cur != NULL)
     {
         // hack to get away first scheduling 1st time
         // save the stack pointer of the current thread
@@ -222,15 +214,19 @@ static void *timer_intr_handler(struct intr_frame *frame)
     write_cr3(cur->proc->cr3);
     flush_tlb();
 
+    // write tss segment
+    utss.rsp0 = (uint64)((uintptr)cur->kstack + cur->kstack_sz);
+
     // now we are in the target address space
     // the only thing to do is to switch stack, which will be done in ASM handler
     return (void *) cur->rsp0;
 }
 
+extern char init_stack[];
+
 int32 intr_init()
 {
     int32 ret;
-    kprintf("Initializing interrupts...\n");
     // init GDT
     write_gdt_desc(&gdt[GDT_NULL], 0, 0, 0); // empty desc
     write_gdt_desc(&gdt[GDT_K_CODE], 0, 0xFFFFFFFF,
@@ -245,10 +241,19 @@ int32 intr_init()
     write_gdt_desc(&gdt[GDT_U_DATA], 0, 0xFFFFFFFF,
                    SEG_LONG | SEG_DPL_3 | SEG_PRESENT | SEG_GRANULARITY | SEG_CODE_DATA |
                    SEG_TYPE_DATA_RW); // user data
+    // write tss
+    write_gdt_desc(&gdt[GDT_U_TSS], (uint32) &utss, sizeof(struct tss),
+                   SEG_PRESENT | SEG_DPL_3 | ((uint64)9 << 40));
+    // write high bits
+    *(uint64 *) &gdt[GDT_U_TSS + 1] = ((uintptr)&utss) >> 32;
+
+    // init tss
+    mem_set(&utss, 0, sizeof(struct tss));
 
     gdtptr.size = GDT_SIZE - 1;
     gdtptr.offset = (uintptr) gdt;
     flush_gdt(&gdtptr, SEL(GDT_K_CODE, 0, 0), SEL(GDT_K_DATA, 0, 0));
+    flush_tss(SEL(GDT_U_TSS, 0, 3));
 
     idtptr.offset = (uintptr) idt;
     idtptr.size = IDT_SIZE - 1;
@@ -256,13 +261,11 @@ int32 intr_init()
     {
         write_idt_desc(&idt[i], (uintptr) intr_stub_array[i],
                        SEL(GDT_K_CODE, 0, 0),
-                       GATE_DPL_0 | GATE_TYPE_INTERRUPT | GATE_PRESENT);
+                       GATE_DPL_3 | GATE_TYPE_INTERRUPT | GATE_PRESENT);
     }
     mem_set(intr_disp_tbl, 0, sizeof(intr_disp_tbl));
     flush_idt(&idtptr);
     ret = init_apic();
-
-    BOCHS_BREAK;
 
     if (ret == ESUCCESS)
     {
@@ -337,11 +340,12 @@ void send_ipi(uint32 vec)
     uint64 irq = READ_IRQ();
     WRITE_IRQ(0xf);
 
-    write_apic_reg_64(APIC_REG_ICR, reg);
+    write_apic_reg(APIC_REG_ICR_L, (uint32)reg);
+    write_apic_reg(APIC_REG_ICR_H, (uint32)(reg >> 32));
     // block until successfully delivered
     while (reg & IPI_STATUS_MASK)
     {
-        reg = read_apic_reg_64(APIC_REG_ICR);
+        reg = read_apic_reg(APIC_REG_ICR_L);
     }
 
     WRITE_IRQ(irq);

@@ -1,4 +1,3 @@
-
 AS := nasm
 CC := clang-6.0
 LD := lld-6.0
@@ -31,7 +30,7 @@ C_FLAGS =   -x c \
 			-Wno-zero-length-array \
 			$(C_FLAGS_ARCH_X86_64) \
 			-I$(INC)/ \
-			$(C_FLAGS_$(MOD))
+			$(C_EFLAGS)
 
 AS_FLAGS =  -w+all \
 			-w+error \
@@ -64,7 +63,6 @@ LD_SCRIPT := linker.ld
 GRUB_CFG := grub.cfg
 
 TGT := $(OUT)/kernel.elf
-FILE := storage
 ISO := $(OUT)/curros.iso
 DMP := $(OUT)/kernel.dmp
 
@@ -83,7 +81,8 @@ C_SRC := kmain.c \
 		spin_lock.c \
 		thread.c \
 		proc.c \
-		paging.c
+		paging.c \
+		syscall.c
 
 # ===============================
 # Add additional ASM source files here
@@ -100,8 +99,6 @@ C_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(C_SRC)))
 
 ASM_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(ASM_SRC)))
 
-$(info $(C_OBJ))
-
 $(C_OBJ): $(OUT)/%.c.o : $(SRC)/%.c
 	$(CC) $(C_FLAGS) -o $@ $<
 
@@ -109,7 +106,7 @@ $(ASM_OBJ): $(OUT)/%.asm.o : $(SRC)/%.asm
 	$(AS) $(AS_FLAGS) -o $@ $<
 
 $(TGT): $(C_OBJ) $(ASM_OBJ) $(LD_SCRIPT)
-	$(CC) $(LD_FLAGS) -o $@ $^ -v
+	$(CC) $(LD_FLAGS) -o $@ $^
 
 $(DMP): $(TGT)
 	$(DAS) $(DUMP_FLAGS) $< > $@
@@ -118,7 +115,7 @@ $(ISO): $(TGT) $(GRUB_CFG)
 	mkdir -p $(OUT)/temp/boot/grub
 	cp $(GRUB_CFG) $(OUT)/temp/boot/grub/
 	cp $(TGT) $(OUT)/temp/
-	cp $(FILE) $(OUT)/temp/
+	cp ./user/out/hello.elf $(OUT)/temp/
 	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(ISO) $(OUT)/temp
 
 .PHONY: mkdir
