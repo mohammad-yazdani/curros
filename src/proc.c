@@ -124,7 +124,7 @@ int32 proc_create(void* elf64, uint32 *pid)
         // need to properly unmap everything
         if (cr3 != (uintptr) NULL)
         {
-            pfree(cr3);
+            pfree((void *)cr3);
         }
     }
 

@@ -8,7 +8,7 @@
 #include <print.h>
 
 #define SYS_TOTAL (K_DYN_END - K_DYNAMIC) // heap start - end
-#define TOTAL_PAGE_NUM (SYS_TOTAL / PAGE_SIZE)
+#define TOTAL_PAGE_NUM 0x40000 // For testing
 
 #define BKTSZ 32
 
@@ -36,26 +36,9 @@ get_index(vaddr address)
 vm_node *
 get_alloc_node()
 {
-    usize allocsz = sizeof(vm_node) + sizeof(vm_atom);
-    vm_node *alloc = NULL;
-    vm_atom *atom = NULL;
-
-    if (kmem->global_alloc->size < 320)
-    {
-        vaddr tail = (vaddr) kmem->global_alloc->tail;
-        if (!tail)
-        { tail = (vaddr) kmem->global_alloc; }
-        alloc = (void *) (tail + allocsz);
-        atom = (void *) ((vaddr) alloc + sizeof(vm_node));
-        alloc->data = atom;
-        lb_llist_push_back(kmem->global_alloc, alloc);
-    }
-    else
-    {
-        alloc = kalloc(sizeof(vm_node));
-        atom = kalloc(sizeof(vm_atom));
-        alloc->data = atom;
-    }
+    vm_node * alloc = R_PADDR((paddr)pmalloc(sizeof(vm_node)));
+    vm_atom * atom = R_PADDR((paddr)pmalloc(sizeof(vm_atom)));
+    alloc->data = atom;
 
     return alloc;
 }
@@ -64,17 +47,13 @@ void *
 vm_alloc(usize size, uint8 sector_id)
 {
     vm_sector *sector = &(kmem->sectors[sector_id]);
-    if (size < sector->largest_free->free)
-    {
-        for (uint32 i = 0; i < BKTSZ; i++)
-        {
+    if (sector->largest_free && size < sector->largest_free->free) {
+        for (uint32 i = 0; i < BKTSZ; i++) {
             vm_object *obj = sector->actbck[i];
-            if (size < obj->free)
-            {
+            if (size < obj->free) {
                 // Allocate
                 vaddr offset = 0;
-                if (obj->allocs.head)
-                {
+                if (obj->allocs.head) {
                     vm_node *head_node = obj->allocs.head;
                     vm_atom *head_atom = head_node->data;
                     offset += head_atom->offset + head_atom->size;
@@ -90,27 +69,21 @@ vm_alloc(usize size, uint8 sector_id)
                 lb_llist_push_front(&(obj->allocs), node);
 
                 obj->free -= size;
-                if (obj->status == 2)
-                {
+                if (obj->status == 2) {
                     obj->status = 1;
 
-                    if (sector->dirty == 31)
-                    {
+                    if (sector->dirty == 31) {
                         sector->largest_free = sector->actbck[0];
-                        for (uint32 j = 1; j < 32; j++)
-                        {
-                            if (sector->actbck[j]->free > sector->largest_free->free)
-                            {
+                        for (uint32 j = 1; j < 32; j++) {
+                            if (sector->actbck[j]->free > sector->largest_free->free) {
                                 sector->largest_free = sector->actbck[j];
                             }
                         }
                     }
                     sector->dirty += 1;
                 }
-                if (sector->dirty == 32)
-                {
-                    if (sector->largest_free->free < obj->free)
-                    {
+                if (sector->dirty == 32) {
+                    if (sector->largest_free->free < obj->free) {
                         sector->largest_free = obj;
                     }
                 }
@@ -120,10 +93,9 @@ vm_alloc(usize size, uint8 sector_id)
                 return ptr;
             }
         }
-        return 0;
-    }
-    else
-    {
+        sector->largest_free = NULL;
+        return vm_alloc(size, sector_id);
+    } else {
         vm_object **old = sector->actbck;
 
         sector->actbck = sector->resbck;
@@ -132,11 +104,9 @@ vm_alloc(usize size, uint8 sector_id)
 
         uint32 i = 0;
         uint64 limit = sector->start;
-        while (i < BKTSZ && limit < sector->end)
-        {
+        while (i < BKTSZ && limit < sector->end) {
             vm_object *page = &(kmem->pages[limit]);
-            if (page->status == 0)
-            {
+            if (page->status == 0) {
                 page->status = 2;
                 old[i] = page;
                 i += 1;
@@ -144,20 +114,19 @@ vm_alloc(usize size, uint8 sector_id)
             limit += 1;
         }
 
-        if (i < 30)
-        {
+        if (i < 30) {
             kprintf("WARNING: NOT ENOUGH MEM TO FILL BUCKET.\n");
         }
         sector->resbck = old;
 
-        return 0;
+        return vm_alloc(size, sector_id);
     }
 }
 
 /* Subsystem interface */
 
 void
-init_vm2(struct spin_lock *vmlk)
+init_vm(struct spin_lock *vmlk)
 {
     vm_global_lock = vmlk;
 
@@ -165,21 +134,16 @@ init_vm2(struct spin_lock *vmlk)
 
     spin_lock(vm_global_lock);
 
-    kmem = pmalloc(PAGE_SIZE);
+    kmem = (void *)R_PADDR((paddr)pmalloc(PAGE_SIZE));
     kmem->groups = 0x0;
-
-    kmem->global_alloc = pmalloc(4 * PAGE_SIZE);
-    kmem->global_alloc->head = 0x0;
-    kmem->global_alloc->tail = 0x0;
-    kmem->global_alloc->size = 0;
 
     // Set up pages
     usize vm_pages_books = (TOTAL_PAGE_NUM / sizeof(vm_object));
-    kmem->pages = pmalloc(vm_pages_books * PAGE_SIZE);
+    kmem->pages = (void *)R_PADDR((paddr)pmalloc(vm_pages_books * PAGE_SIZE));
     vaddr curr_address = K_DYNAMIC;
 
     uint64 counter = 0;
-    while (curr_address < K_DYN_END)
+    while (counter < TOTAL_PAGE_NUM)
     {
         vm_object *obj = &(kmem->pages[counter]);
         obj->address = curr_address;
@@ -217,8 +181,8 @@ init_vm2(struct spin_lock *vmlk)
     {
         vm_sector *sector = &(kmem->sectors[secnum]);
 
-        sector->actbck = pmalloc(PAGE_SIZE);
-        sector->resbck = pmalloc(PAGE_SIZE);
+        sector->actbck = R_PADDR((paddr)pmalloc(PAGE_SIZE));
+        sector->resbck = R_PADDR((paddr)pmalloc(PAGE_SIZE));
         for (uint32 i = 0; i < BKTSZ; i++)
         {
             vm_object *obj_act = &(kmem->pages[sector->start + i]);
@@ -249,7 +213,7 @@ void *
 vm_alloc_multpages(usize size)
 {
     usize left_over = size % PAGE_SIZE;
-    uint64 n = (size / PAGE_SIZE) + 1;
+    uint64 n = (size / PAGE_SIZE) + (left_over > 0);
 
     uint64 head = kmem->sectors[2].end;
     vm_object *frame = NULL;
@@ -295,15 +259,15 @@ vm_alloc_multpages(usize size)
         end_frame->free = PAGE_SIZE - left_over;
 
         uint8 sector_id = 0;
-        if (size <= SECTOR0_BOUND)
+        if (left_over <= SECTOR0_BOUND)
         {
             sector_id = 0;
         }
-        else if (size <= SECTOR1_BOUND)
+        else if (left_over <= SECTOR1_BOUND)
         {
             sector_id = 1;
         }
-        else if (size <= PAGE_SIZE)
+        else if (left_over < PAGE_SIZE)
         {
             sector_id = 2;
         }
@@ -326,7 +290,7 @@ vm_alloc_multpages(usize size)
                 atom->page_ptr = end_frame;
                 atom->offset = offset;
 
-                lb_llist_push_back(&(end_frame->allocs), node);
+                lb_llist_push_front(&(end_frame->allocs), node);
 
                 end_frame->status = 1;
 
@@ -346,7 +310,7 @@ vm_alloc_multpages(usize size)
 static void *pointer;
 static struct spin_lock lock;
 
-void *kalloc(usize size)
+void *kalloc2(usize size)
 {
     spin_lock(&lock);
 
@@ -371,7 +335,7 @@ void *kalloc(usize size)
         // ret val does not cross page boundries
         if (get_paddr(read_cr3(), (uintptr) ret) == (uintptr) NULL)
         {
-            uintptr frame = (uintptr) pmalloc(PAGE_SIZE);
+            uintptr frame = (uintptr) R_PADDR((paddr)pmalloc(PAGE_SIZE));
             status = (frame != (uintptr) NULL) && (map_vmem(read_cr3(), (uintptr) ret, frame) != ESUCCESS);
         }
     }
@@ -390,20 +354,20 @@ void *kalloc(usize size)
     return ret;
 }
 
-void init_vm()
+void init_vm2()
 {
     pointer = (void *) K_DYNAMIC;
     spin_init(&lock);
 }
 
 void
-kfree(void *ptr)
+kfree2(void *ptr)
 {
     UNREFERENCED(ptr);
 }
 
 void *
-kalloc2(usize size)
+kalloc(usize size)
 {
     spin_lock(vm_global_lock);
 
@@ -417,7 +381,7 @@ kalloc2(usize size)
     {
         sector_id = 1;
     }
-    else if (size <= PAGE_SIZE)
+    else if (size < PAGE_SIZE)
     {
         sector_id = 2;
     }
@@ -437,7 +401,8 @@ kalloc2(usize size)
         if (get_paddr(read_cr3(), (uintptr) ret) == (uintptr) NULL)
         {
             uintptr frame = (uintptr) pmalloc(PAGE_SIZE);
-            status = (frame != (uintptr) NULL) && (map_vmem(read_cr3(), (uintptr) ret, frame) != ESUCCESS);
+            uint64 map_stat = map_vmem(read_cr3(), (uintptr) ret, frame);
+            status = (frame != (uintptr) NULL) && (map_stat != ESUCCESS);
         }
     }
 
@@ -455,7 +420,7 @@ kalloc2(usize size)
 }
 
 void
-kfree2(void *ptr)
+kfree(void *ptr)
 {
     spin_lock(vm_global_lock);
 
@@ -500,19 +465,17 @@ kfree2(void *ptr)
             }
 
             spin_unlock(vm_global_lock);
-            if (kmem->global_alloc->size >= 320)
-            {
-                kfree(atom);
-                kfree(tail);
-            }
+            pfree(atom);
+            pfree(tail);
 
             return;
         }
-        if (tail == tail->next)
+        if (tail == tail->prev)
         { break; }
-        tail = tail->next;
+        tail = tail->prev;
     }
 
     spin_unlock(vm_global_lock);
 }
+
 

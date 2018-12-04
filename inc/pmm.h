@@ -17,7 +17,7 @@ typedef struct allocation_unit {
 } allocu;
 
 void * pmalloc(uint32 size); // Allocate a physical page
-void pfree(paddr p); // Free physical page
+void pfree(void * p); // Free physical page
 
 // TODO : Setup methods
 void pmm_init(uint64 low, uint64 high);
