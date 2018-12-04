@@ -20,6 +20,8 @@ void pmm_test();
 
 void vmm_test();
 
+void vmm_test_sectors();
+
 void kmain(mbentry *mb)
 {
     int32 status;
@@ -40,8 +42,13 @@ void kmain(mbentry *mb)
             (uint64) (module->mod_end - module->mod_start));
 
     pmm_init(mem_low, mem_high);
+    pmm_test();
+    
 
-    init_vm();
+    struct spin_lock vmlk = {0};
+    init_vm(&vmlk);
+    vmm_test();
+    vmm_test_sectors();
 
     thread_init();
     status = proc_init((void*)kproc);
@@ -121,17 +128,6 @@ void kproc(void *arg)
     }
 }
 
-void
-pmm_test()
-{
-    int32 *llmem1 = pmalloc(4096);
-    *llmem1 = 14;
-    int32 *llmem2 = pmalloc(4096);
-    *llmem2 = *llmem1 + 12;
-    (void) llmem2;
-    pfree((paddr) llmem2);
-    pfree((paddr) llmem1);
-}
 
 typedef struct dummys
 {
@@ -140,23 +136,56 @@ typedef struct dummys
 } ds;
 
 void
+pmm_test()
+{
+    uint64 *test_int = R_PADDR((paddr)pmalloc(PAGE_SIZE));
+    *test_int = 345;
+    pfree(test_int);
+    kprintf("PMM TEST OK\n");
+}
+
+
+void
 vmm_test()
 {
     uint64 *test_int = kalloc(sizeof(uint64));
-    ds *dummy = kalloc(sizeof(ds));
-    dummy->test0 = 34;
-    dummy->test1 = 12234322;
-    *test_int = 345;
+    kprintf("%d\n", *test_int);
+    *test_int = 2;
 
+    uint64 test = *test_int;
     for (int i = 0; i < 10; i++)
     {
-        void *a = kalloc(48);
-        kprintf("0x%x\n", a);
+        test_int += (i * 4);
+        void *a = kalloc(test);
+        kprintf("VM: 0x%x\n", a);
     }
 
-    kfree(dummy);
+    void * page_alloc = kalloc(511);
+    kfree(page_alloc);
+    page_alloc = kalloc(63);
+    kfree(page_alloc);
+    page_alloc = kalloc(513);
+    kfree(page_alloc);
+    page_alloc = kalloc(PAGE_SIZE);
+    kfree(page_alloc);
+    page_alloc = kalloc(PAGE_SIZE + 1);
+
+    kfree(page_alloc);
     kfree(test_int);
 
     kprintf("VMM TEST OK\n");
+}
+
+void
+vmm_test_sectors()
+{
+    /*usize sec0lo = 63, sec0hi = 65, sec0 = 64;
+    usize sec1lo = 511, sec1hi = 513, sec1 = 512;
+    usize sec2lo = 4088, sec2hi = 240323, sec2 = PAGE_SIZE;
+    */
+    // TODO : Test sequentially
+    // TODO : Test In loops
+
+    // TODO : Out of order free
 }
 
