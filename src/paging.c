@@ -101,17 +101,17 @@ int32 map_vmem(uint64 cr3, uintptr vaddr, uintptr paddr)
     {
         if (pdpt_alloc != (uintptr) NULL)
         {
-            pfree(pdpt_alloc);
+            pfree((void *)pdpt_alloc);
         }
 
         if (pd_alloc != (uintptr) NULL)
         {
-            pfree(pd_alloc);
+            pfree((void *)pd_alloc);
         }
 
         if (pt_alloc != (uintptr) NULL)
         {
-            pfree(pt_alloc);
+            pfree((void *)pt_alloc);
         }
     }
 

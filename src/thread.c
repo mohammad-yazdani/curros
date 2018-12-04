@@ -394,7 +394,7 @@ int32 thread_create(struct pcb *proc, void *entry, void *args, uint32 *tid)
 
         if (ustack != (uintptr) NULL)
         {
-            pfree(ustack);
+            pfree((void *)ustack);
         }
 
         if (kstack != NULL)

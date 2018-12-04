@@ -51,7 +51,6 @@ typedef struct page_table_entries
     vm_sector sectors[3];
     vm_object *pages;
 
-    vmll *global_alloc;
     usize free_frames;
 } vmem;
 
@@ -60,5 +59,6 @@ void init_vm();
 void vm_issue_unit(uint64 id, usize size);
 
 void *kalloc(usize size);
-
 void kfree(void *ptr);
+
+

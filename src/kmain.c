@@ -19,6 +19,8 @@ void kproc(void *arg);
 
 void *_module;
 
+void vmm_test_sectors();
+
 void kmain(mbentry *mb)
 {
     char *ld_name = 0x0;
@@ -44,7 +46,8 @@ void kmain(mbentry *mb)
     kprintf("Initializing PMM...\n");
     pmm_init(mem_low, mem_high);
     kprintf("Initializing VMM...\n");
-    init_vm();
+    struct spin_lock vmlk = {0};
+    init_vm(&vm);
 
     kprintf("Initializing threads...\n");
     thread_init();
@@ -136,3 +139,65 @@ void kproc(void *arg)
         thread_yield();
     }
 }
+
+
+typedef struct dummys
+{
+    uint16 test0;
+    int64 test1;
+} ds;
+
+void
+pmm_test()
+{
+    uint64 *test_int = R_PADDR((paddr)pmalloc(PAGE_SIZE));
+    *test_int = 345;
+    pfree(test_int);
+    kprintf("PMM TEST OK\n");
+}
+
+
+void
+vmm_test()
+{
+    uint64 *test_int = kalloc(sizeof(uint64));
+    kprintf("%d\n", *test_int);
+    *test_int = 2;
+
+    uint64 test = *test_int;
+    for (int i = 0; i < 10; i++)
+    {
+        test_int += (i * 4);
+        void *a = kalloc(test);
+        kprintf("VM: 0x%x\n", a);
+    }
+
+    void * page_alloc = kalloc(511);
+    kfree(page_alloc);
+    page_alloc = kalloc(63);
+    kfree(page_alloc);
+    page_alloc = kalloc(513);
+    kfree(page_alloc);
+    page_alloc = kalloc(PAGE_SIZE);
+    kfree(page_alloc);
+    page_alloc = kalloc(PAGE_SIZE + 1);
+
+    kfree(page_alloc);
+    kfree(test_int);
+
+    kprintf("VMM TEST OK\n");
+}
+
+void
+vmm_test_sectors()
+{
+    /*usize sec0lo = 63, sec0hi = 65, sec0 = 64;
+    usize sec1lo = 511, sec1hi = 513, sec1 = 512;
+    usize sec2lo = 4088, sec2hi = 240323, sec2 = PAGE_SIZE;
+    */
+    // TODO : Test sequentially
+    // TODO : Test In loops
+
+    // TODO : Out of order free
+}
+

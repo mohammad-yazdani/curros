@@ -1,4 +1,3 @@
-
 AS := nasm
 CC := clang-6.0
 LD := lld-6.0
@@ -134,4 +133,7 @@ all: mkdir $(TGT) $(DMP) $(ISO)
 debug: 
 	qemu-system-x86_64 -boot d -cdrom $(ISO)
 
+.PHONY: gdb
+gdb: 
+	qemu-system-x86_64 -s -m 128 -boot d -cdrom $(ISO) 
 
