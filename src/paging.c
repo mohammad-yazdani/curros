@@ -92,7 +92,9 @@ int32 map_vmem(uint64 cr3, uintptr vaddr, uintptr paddr)
     {
         uint64 *pt_e = R_PADDR((*pd_e & NEXT_LEVEL_MASK) + ENTRY_SIZE * PT_ENTRY(vaddr));
         write_page_table(pt_e, paddr, BIT_PRESENT | BIT_WRITEABLE | (IS_KERN_SPACE(vaddr) ? 0 : BIT_USER));
+#ifdef KDBG
         kprintf("Mapped 0x%x to 0x%x\n", vaddr, paddr);
+#endif
     }
 
     if (ret != ESUCCESS)

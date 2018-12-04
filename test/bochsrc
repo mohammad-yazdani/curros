@@ -1,0 +1,6 @@
+display_library: x, options="gui_debug"
+cpuid: 1g_pages=1
+ata0-master: type=cdrom, path="out/curros.iso", status=inserted
+boot: cdrom
+magic_break: enabled=1
+memory: guest=512, host=512

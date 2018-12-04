@@ -352,11 +352,11 @@ PUSH_REGS
 mov rdi, 50
 mov rsi, rsp
 call intr_dispatcher
+xchg bx,bx
                       ; now rax hows the next thread's rsp0
 mov rsp, rax          ; switch stack
 POP_REGS              ; restore registers
 add rsp, 8            ; skip error code
-xchg bx,bx
 iretq
 
 decl_intr_stub 51

@@ -29,51 +29,54 @@ C_FLAGS =   -x c \
 			-Wno-error=int-to-pointer-cast \
 			-Wno-error=zero-length-array \
 			$(C_FLAGS_ARCH_X86_64) \
-			-I$(INC)/ \
-			$(C_FLAGS_$(MOD))
+			-I$(INC)/
 
-DUMP_FLAGS = -x86-asm-syntax=intel \
-			 -disassemble \
-			 -r \
-			 -t \
-			 -triple=x86_64-pc-none-elf \
-			 -print-imm-hex
+AS_FLAGS =  -w+all \
+			-w+error \
+			-f elf64 \
+			-F dwarf \
+			-g \
+			-I$(INC)/ \
 
 LD_FLAGS =  -fuse-ld=$(LD) \
 			-nostdlib \
-			-Wl, \
+			-Wl, linker.ld \
 			-Wl,--fatal-warnings
 
 # ===============================
 # HERE COMES file definitions
 # ===============================
 
+INC := inc
 SRC := .
 OUT := out
+TGT := $(OUT)/hello.elf
 
 # ===============================
 # Add additional c source files here
 # ===============================
-C_SRC := hello_hell.c
-TGT := $(OUT)/hello_hell.elf
+C_SRC := hello.c
+
+# ===============================
+# Add additional ASM source files here
+# ===============================
+ASM_SRC := curros.asm
 
 # ===============================
 # Compilation rules
 # ===============================
 C_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(C_SRC)))
 
-$(info $(C_OBJ))
+ASM_OBJ := $(addsuffix .o, $(addprefix $(OUT)/,$(ASM_SRC)))
 
-$(C_OBJ): $(OUT)/%.c.o : $(SRC)/%.c
+$(C_OBJ): $(OUT)/%.c.o : %.c
 	$(CC) $(C_FLAGS) -o $@ $<
 
-$(TGT): $(C_OBJ)
-	$(CC) -o $@ $^ -v
+$(ASM_OBJ): $(OUT)/%.asm.o : %.asm
+	$(AS) $(AS_FLAGS) -o $@ $<
 
-$(DMP): $(TGT)
-	$(DAS) $(DUMP_FLAGS) $< > $@
-
-
+$(TGT): $(C_OBJ) $(ASM_OBJ)
+	$(CC) $(LD_FLAGS) -o $@ $^
 
 .PHONY: mkdir
 mkdir:
@@ -84,5 +87,5 @@ clean:
 	rm -rf $(OUT)
 
 .PHONY: all
-all: mkdir $(TGT) $(DMP)
+all: mkdir $(TGT)
 
