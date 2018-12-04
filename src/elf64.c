@@ -41,8 +41,13 @@ elf_check_supported(elf64_hdr *hdr)
     return 1;
 }
 
-static int32 elf_load_seg(struct pcb *proc, void *seg_start, usize seg_size, void *vaddr)
+static int32 elf_load_seg(struct pcb *proc, void* file, elf64_phdr* hdr)
 {
+    void *seg_start = (void*)((uintptr)file + hdr->p_offset);
+    void *vaddr = (void*)hdr->p_vaddr;
+    usize file_size = hdr->p_filesz;
+    usize mem_size = hdr->p_memsz;
+
     int32 ret = ESUCCESS;
     if (((uintptr) vaddr & 0xfff) != 0)
     {
@@ -52,7 +57,7 @@ static int32 elf_load_seg(struct pcb *proc, void *seg_start, usize seg_size, voi
 
     if (ret == ESUCCESS)
     {
-        uint32 num_pages = ((uint32) seg_size + KERNEL_PAGE_SIZE - 1) / KERNEL_PAGE_SIZE;
+        uint32 num_pages = ((uint32)mem_size + KERNEL_PAGE_SIZE - 1) / KERNEL_PAGE_SIZE;
 
         // allocate memory
         for (uint32 i = 0; i < num_pages; i++)
@@ -66,17 +71,24 @@ static int32 elf_load_seg(struct pcb *proc, void *seg_start, usize seg_size, voi
 
             if (ret == ESUCCESS)
             {
-                ret = map_vmem(proc->cr3, (uintptr) vaddr + i * KERNEL_PAGE_SIZE, page);
+                ret = map_vmem(proc->cr3, (uintptr) vaddr, page);
+            }
+
+            if (ret == ESUCCESS)
+            {
+                usize cpy_size = file_size > KERNEL_PAGE_SIZE ? KERNEL_PAGE_SIZE : (file_size % KERNEL_PAGE_SIZE);
+                // copy the current segment
+                mem_cpy(seg_start, R_PADDR(page), cpy_size);
             }
 
             if (ret != ESUCCESS)
             {
                 break;
             }
-        }
 
-        // copy segment
-        mem_cpy(seg_start, vaddr, seg_size);
+            vaddr = (void *) ((uintptr) vaddr + KERNEL_PAGE_SIZE);
+            seg_start = (void *) ((uintptr) seg_start + KERNEL_PAGE_SIZE);
+        }
     }
 
     if (ret != ESUCCESS)
@@ -103,21 +115,18 @@ elf_load_file(struct pcb *proc, void *file, void **entry)
         // load program segments
         for (int i = 0; i < hdr->e_phnum; i++)
         {
-            elf64_phdr *each_seg = (elf64_phdr *) (phdr_start + i * sizeof(elf64_phdr));
-            if (each_seg->p_flags == PT_LOAD)
+            elf64_phdr *each_seg = (elf64_phdr *) ((uintptr) phdr_start + i * hdr->e_phentsize);
+            if (each_seg->p_type == PT_LOAD)
             {
-                if (each_seg->p_memsz != each_seg->p_filesz)
+                // load segment
+                ret = elf_load_seg(proc, file, each_seg);
+#ifdef KDBG
+                if (ret == ESUCCESS)
                 {
-                    ret = EINVARG;
+                    kprintf("Loaded segment offset 0x%x to vaddr 0x%x, fs: %d, ms: %d\n", (uint64) each_seg->p_offset,
+                            (uint64) each_seg->p_vaddr, (uint64) each_seg->p_filesz, (uint64) each_seg->p_memsz);
                 }
-                else
-                {
-                    kprintf("Loading segment offset 0x%x to vaddr 0x%x, size: %d", (uint64) each_seg->p_offset,
-                            (uint64) each_seg->p_vaddr, (uint64) each_seg->p_memsz);
-                    // load segment
-                    ret = elf_load_seg(proc, (void *) ((uintptr) file + each_seg->p_offset), each_seg->p_memsz,
-                                       (void *) each_seg->p_vaddr);
-                }
+#endif
             }
             if (ret != ESUCCESS)
             {

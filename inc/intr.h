@@ -7,9 +7,10 @@
 #define WRITE_IRQ(x)  write_cr8(x)
 
 #define NUM_IDT_DESC (256)
-#define NUM_GDT_DESC (5)
+#define NUM_GDT_DESC (7)
 #define IDT_DESC_SIZE (16)
 #define GDT_DESC_SIZE (8)
+// + 8 because TSS descriptor is 16 bytes instead
 #define GDT_SIZE ((NUM_GDT_DESC) * (GDT_DESC_SIZE))
 #define IDT_SIZE ((NUM_IDT_DESC) * (IDT_DESC_SIZE))
 
@@ -18,6 +19,7 @@
 #define GDT_K_DATA (2)
 #define GDT_U_CODE (3)
 #define GDT_U_DATA (4)
+#define GDT_U_TSS (5)
 #define SEL(idx, TI, RPL) ((((uint16)idx) << 3) | (((uint16) TI) << 2) | ((uint16) RPL))
 
 struct PACKED gdtr
@@ -79,6 +81,15 @@ struct PACKED intr_frame
     uint64 rflags;
     uint64 rsp;
     uint64 ss;
+};
+
+struct PACKED tss
+{
+    uint32 unused0;
+    uint64 rsp0;
+    uint64 rsp1;
+    uint64 rsp2;
+    uint32 unused1[19];
 };
 
 #define INTR_VEC_TIMER    (50)

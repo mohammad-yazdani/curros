@@ -25,18 +25,12 @@ process_mmap(struct multiboot_tag_mmap *mmap)
         entry = mmap->entries[i];
         if ((entry.type == 1) && (entry.len > _high - _low))
         {
+#ifdef KDBG
             kprintf("Update low: 0x%x high: 0x%x\n", (uint64) entry.addr, (uint64) (entry.addr + entry.len));
+#endif
             _high = entry.addr + entry.len;
             _low = entry.addr;
         }
-//        if (entry.type == 1) {
-//            if (entry.addr) {
-//                set_mmap_high(entry.addr, entry.len);
-//            }
-//            else {
-//                set_mmap_low(entry.addr, entry.len);
-//            }
-//        }
     }
 }
 
@@ -46,7 +40,7 @@ process_tag(htag *tag)
 {
     struct multiboot_tag_mmap *mmap_tag;
     struct multiboot_tag_string *strtag;
-
+    struct multiboot_tag_module *modtag;
     while(1)
     {
         if(tag->type == MULTIBOOT_HEADER_TAG_END)
@@ -56,14 +50,19 @@ process_tag(htag *tag)
 
         switch (tag->type)
         {
-            case 2:
+            case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
                 strtag = (struct multiboot_tag_string *) tag;
                 loader_name = &strtag->string[0];
                 tag = (void*)ALIGN(uintptr, (uintptr)tag + tag->size, MULTIBOOT_TAG_ALIGN);
                 break;
-            case 6:
+            case MULTIBOOT_TAG_TYPE_MMAP:
                 mmap_tag = (struct multiboot_tag_mmap *) tag;
                 process_mmap(mmap_tag);
+                tag = (void*)ALIGN(uintptr, (uintptr)tag + tag->size, MULTIBOOT_TAG_ALIGN);
+                break;
+            case MULTIBOOT_TAG_TYPE_MODULE:
+                modtag = (struct multiboot_tag_module *)tag;
+                file_mod = modtag;
                 tag = (void*)ALIGN(uintptr, (uintptr)tag + tag->size, MULTIBOOT_TAG_ALIGN);
                 break;
             default:
@@ -89,7 +88,7 @@ void parse_mb2(mbentry *mb, void **module, char **ld_name, uint64 *low, uint64 *
     htag *tag = (htag *) next_entry;
     process_tag(tag);
 
-    *module = R_PADDR((uintptr)file_mod);
+    *module = file_mod;
     *ld_name = loader_name;
     *low = _low;
     *high = _high;
