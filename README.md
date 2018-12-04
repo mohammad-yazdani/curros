@@ -1,5 +1,5 @@
-# CurrSOS
-CurrSOS is a simple x86-64 kernel that supports interrupt, memory management, processes and threads, userspace and system calls. It has vastly simplier but not better memory management than its successor CurrOS.
+# CurrOS
+CurrOS is a simple x86-64 kernel that supports interrupt, memory management, processes and threads, userspace and system calls. It has vastly simplier but not better memory management than its successor CurrOS.
 
 ## Toolchain
 clang, lld, xorriso, grub-pc-bin, nasm
